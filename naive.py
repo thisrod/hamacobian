@@ -16,6 +16,7 @@ def rho(z):
 	return exp(logrho)
 	
 def jsq(z, rho):
+	"Nothing"
 	n, m, f, A = extract(matrix(z))
 	w = matrix(z)
 	w[:,0] = 1
