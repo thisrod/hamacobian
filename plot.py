@@ -25,7 +25,8 @@ def plotens(z):
 	global mpfd
 	mpfd = open("a.mp", "w")
 	plot_begin();
-	mpfd.write("u := 1in;\n\nbeginfig(1)\n")
+	plot_scale(z);
+	mpfd.write("\nbeginfig(1)\n")
 	for r in z:
 		plot_cpt(r[0], r[1])
 	mpfd.write("draw fullcircle scaled 2u withcolor junk;\n")
@@ -38,7 +39,14 @@ def plotens(z):
 
 def plot_scale(z):
 	"""generate Metapost code to set the scales u and v.  u, the coherent amplitude scale, is set so the markers fit in a 2in square.  v, the weight scale, is set so the maximum radius is 1/3 the median distance to the nearest mark."""
-	pass
+	if z.shape[0] == 1:
+		a = max(2, abs(z[0,1])+1)
+	else:
+		a = max(z[:,1].real.max() - z[:,1].real.min(), z[:,1].imag.max() - z[:,1].imag.min())
+	mpfd.write("u*%f = 1in;\n" % a)
+	
+	mpfd.write("v = 1cm;\n")
+	
 
 
 def plot_begin():
@@ -60,5 +68,6 @@ def mark(expr ax, ay, w, f) =
 enddef;\n\n""")
 
 if __name__=="__main__":
-	z = np.array([[0,1.8],[2,2+0.2j],[0+1j,2.2]])
+	"Test data"
+	z = np.array([[0,0.8],[2,1+0.2j],[0+1j,1.2]])
 	plotens(z)
