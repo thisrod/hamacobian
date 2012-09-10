@@ -29,7 +29,7 @@ def plotens(z):
 	mpfd.write("\nbeginfig(1)\n")
 	for r in z:
 		plot_cpt(r[0], r[1])
-	mpfd.write("draw fullcircle scaled 2u withcolor junk;\n")
+	mpfd.write("path p; p := bbox currentpicture;\ndraw fullcircle scaled 2u withcolor junk;\nclip currentpicture to p;\n")
 	mpfd.write("endfig;\nend\n")
 	mpfd.close()
 	check_call(["mpost", "a.mp"])
@@ -45,7 +45,14 @@ def plot_scale(z):
 		a = max(z[:,1].real.max() - z[:,1].real.min(), z[:,1].imag.max() - z[:,1].imag.min())
 	mpfd.write("u*%f = 1in;\n" % a)
 	
-	mpfd.write("v = 1cm;\n")
+	amps = z[:,1:2]
+	w = np.repeat(amps.T, amps.size, 0)
+	for i in range(amps.size):
+		w[i,i] = np.inf
+	b = np.median(abs(w-amps).min(0))
+	c = np.abs(np.exp(z[:,0])).max()
+	print "**********", b, c
+	mpfd.write("%f*v = %f*u*2/3;\n" % (c, b))
 	
 
 
@@ -64,7 +71,7 @@ color junk;
 junk = 0.7 white;
 
 def mark(expr ax, ay, w, f) =
-	draw marker scaled (w*1cm) rotated f shifted (u*(ax, ay));
+	draw marker scaled (w*v) rotated f shifted (u*(ax, ay));
 enddef;\n\n""")
 
 if __name__=="__main__":
