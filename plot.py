@@ -9,15 +9,16 @@ from tempfile import mkdtemp
 from os import chdir
 from os.path import dirname, join
 from subprocess import check_call
-from cmath import pi, phase, exp
+from math import pi, exp
 import numpy as np
 
 
 def plot_cpt(wgt, amp):
 	"Plot a marker for a coherent state with the given coherent amplitude and logarithmic weight-phase."
 	
+	print "**********", exp(wgt.real+0.5*abs(amp)**2)
 	mpfd.write("mark(%f, %f, %f, %f);\n" %
-		(amp.real, amp.imag, abs(exp(wgt)), 180/pi*phase(exp(wgt))))
+		(amp.real, amp.imag, exp(wgt.real+0.5*abs(amp)**2), 180/pi*wgt.imag))
 
 
 def plotens(z):
@@ -50,8 +51,7 @@ def plot_scale(z):
 	for i in range(amps.size):
 		w[i,i] = np.inf
 	b = np.median(abs(w-amps).min(0))
-	c = np.abs(np.exp(z[:,0])).max()
-	print "**********", b, c
+	c = np.exp(z[:,0].real+0.5*np.abs(z[:,1])**2).max()
 	mpfd.write("%f*v = %f*u*2/3;\n" % (c, b))
 	
 
