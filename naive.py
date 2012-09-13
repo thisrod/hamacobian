@@ -3,7 +3,7 @@
 #
 # Convention: f stores a column vector of phis, A stores a matrix whose rows are alpha vectors.
 
-from numpy import array, matrix, exp
+from numpy import array, matrix, empty, exp
 
 	
 def extract(z):
@@ -46,3 +46,10 @@ def amb(z, h, rho):
 def jham(z, h, rho):
 	"""Calculate the Hamiltonian bracket in the Levenberg-Marquardt H, between amplitudes z and z+h.
 	rho gives the inner products between states <z+h| and |z>"""
+
+def jlft(z, rho):
+	"""Calculate the product of the Jacobian bra matrix with the state.  Limited to one mode."""
+	n, m, f, a = extract(matrix(z))
+	Q = empty((2*n,1))
+	Q[0:2*n:2] = sum(rho, 2)
+	Q[1:2*n:2] = rho*a
