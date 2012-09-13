@@ -16,7 +16,6 @@ import numpy as np
 def plot_cpt(wgt, amp):
 	"Plot a marker for a coherent state with the given coherent amplitude and logarithmic weight-phase."
 	
-	print "**********", exp(wgt.real+0.5*abs(amp)**2)
 	mpfd.write("mark(%f, %f, %f, %f);\n" %
 		(amp.real, amp.imag, exp(wgt.real+0.5*abs(amp)**2), 180/pi*wgt.imag))
 

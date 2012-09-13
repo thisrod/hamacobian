@@ -3,7 +3,7 @@
 #
 # Convention: f stores a column vector of phis, A stores a matrix whose rows are alpha vectors.
 
-from numpy import array, matrix, empty, exp
+from numpy import array, matrix, empty, exp, sum
 
 	
 def extract(z):
@@ -51,5 +51,6 @@ def jlft(z, rho):
 	"""Calculate the product of the Jacobian bra matrix with the state.  Limited to one mode."""
 	n, m, f, a = extract(matrix(z))
 	Q = empty((2*n,1))
-	Q[0:2*n:2] = sum(rho, 2)
-	Q[1:2*n:2] = rho*a
+	Q[0:2*n:2,:] = sum(rho, 1)
+	Q[1:2*n:2,:] = rho*a
+	return Q
