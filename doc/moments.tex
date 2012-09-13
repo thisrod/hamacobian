@@ -1,0 +1,50 @@
+\input xpmath
+\input a4
+
+\centerline{\bf Moments occuring in normal equations}
+\vskip 1cm
+\centerline{Rodney E. S. Polkinghorne}
+
+These programs solve ill-posed variational problems using the normal equations for those problems.  They are doomed to instability, as explained in the standard numerical linear algebra textbooks, but they are quick and easy to write.  The normal equations include matrices of moments between kets, which are derived below.
+
+\beginsection{Fock state expansions}
+
+The states that occur in quartic oscillator simulations can be approximated very well by expansions over the lowest few Fock states.  These states have Poissonian distributions of boson number, and, if the average number is $\bar n$, the probability of the number exceeding $f(\bar n)$ is below $10^{-3}$, and that of it exceeding $g(\bar n)$ below $10^{-9}$.
+
+How well can these states be approximated by linear combinations of coherent states?  We aim to investigate this numerically.  In particular, the states at simple rational fractions of the revival period are close to cat states.  But how close?  We can determine that by fitting a superposition of two coherent states.
+
+For notational purposes, in the rest of this section, kets such as $|i〉$ or $|n〉$, with roman letters, or such as $|2〉$, with integers, denote Fock states.  Kets such as $|α〉$ and $|β〉$, with greek letters, or $|2+0i〉$, with complex numbers, denote normal coherent states.  The notation $|0〉$ is ambiguous syntactically, but not semantically.  Other notation, such as $〈Dψ(z)|Dψ(z)〉w$, is explained in the softening notes.
+
+To use numerical optimisation, we must supply the moments, and also an initial guess to optimise.  There are some obvious places to start looking for distributions of coherent states: there are well-known continuous distributions of coherent states that exactly represent the input state, and we can start by sampling one of those.  The problem is that coherent states are overcomplete, so there are many choices of distribution to sample.  I'm going to choose the analytic one Glauber used in the original coherent state paper.  In some cases, such as fitting two coherent states to a suspected cat state, we'll want to cheat and ensure one coherent amplitude samples each component of the superposition.  To start with, we can always cheat, and set the initial amplitudes by eye.
+
+This leaves the moments.  We have a state $|Ψ〉=∑_{n=0}^N c_n|n〉$, which we aim to approximate as $$|ψ(φ₁,α₁,…,φ_r,α_r)〉=\bigl(e^{φ₁+α₁a†}+⋯+e^{φ_r+α_ra†}\bigr)|0〉=e^{φ₁+{1\over 2}|α₁|²}|α₁〉+⋯+e^{φ_r+{1\over 2}|α_r|²}|α_r〉.$$  Given a guess $z$, we want to solve for $w$ such that $$|ψ(z+w)〉=|Ψ〉$$ in a least squares sense.  This linearises to $$|Dψ(z)〉w=|Ψ〉-|ψ(z)〉.$$  The sensible next step would be to expand over Fock states; instead, we form the badly abnormal equations $${\cal V}w=〈Dψ(z)|Dψ(z)〉w=〈Dψ(z)|\bigl(|Ψ〉-|ψ(z)〉\bigr)={\cal Q}.$$
+
+The left hand sides of the normal equations are the same as always, a matrix of moments of $1$, $a$, $a†$ and $aa†$ between coherent states.  The right hand sides involve the difference of two kets, $|Ψ〉$ and $|ψ(z)〉$, which we are making as nearly equal as possible.  They must be evaluated with some care.
+
+The moment we need is $$\eqalign{{\cal Q}_i 
+	&=〈Dψ(φ_i,α_i) |\Big(∑_{j=1}^r|ψ(φ_j,α_j)〉-∑_{n=0}^N c_n|n〉\Bigr)\cr 
+	&=〈ψ(φ_i,α_i)|\pmatrix{1\cr a}\Big(∑_{j=1}^r|ψ(φ_j,α_j)〉-∑_{n=0}^N c_n|n〉\Bigr) \cr 
+	&=∑_{j=1}^r\pmatrix{1\cr α_j}〈ψ(φ_i,α_i)|ψ(φ_j,α_j)〉
+		-∑_{n=0}^N c_ne^{φ_i*+{1\over 2}|α_i|²}〈α_i|\pmatrix{|n〉\cr \sqrt{n}|n-1〉}\cr 
+	&=∑_{j=1}^r\pmatrix{1\cr α_j}e^{φ_i*+φ_j+α_i*α_j}
+		-∑_{n=0}^N c_ne^{φ_i*}\pmatrix{α_i^{\ast n}/\sqrt{n!}\cr α_i^{\ast n-1}\sqrt{n/(n-1)!}}.}$$
+Here, by convention, $0/(-1)!=0$.  
+
+The first term, ${\cal Q}₁$, can be built up by interleaving elements of the column vectors $$ρ\pmatrix{α₁\cr\vdots\cr α_r} \quad{\rm and}\quad ρ\pmatrix{1\cr\vdots\cr 1},$$ where $$ρ = \pmatrix{〈ψ(φ₁,α₁)|\cr\vdots\cr〈ψ(φ_r,α_r)|}\pmatrix{|ψ(φ₁,α₁)〉&…&|ψ(φ_r,α_r)〉}.$$  This is calculated by the Python routine {\tt jlft}.  The second term can be efficiently computed by multiplying the vectors $$\pmatrix{c₀/\sqrt{0!}\cr\vdots\cr c_N/\sqrt{N!}} \quad{\rm and}\quad \pmatrix{c₁\sqrt{1/0!}\cr\vdots\cr c_N\sqrt{N/(N-1)!}}$$ by Vandermonde matrices, scaling by $e^{φ_i*}$, and again interleaving.  Note that Numpy puts the columns of Vandermonde matrices in the opposite order to the textbooks!
+
+
+\beginsection{Moments of the quartic oscillator hamiltonian}
+
+The Hamiltonian vector $${\cal H}=〈Dψ(w)|\bigl(|ψ(w)〉-(1-iHδt/\hbar)|ψ(z)〉\bigr),$$ where $w=z+δz$, is a $RM×1$ vector.  As in the simpler case, it can be split into $R$ subvectors of size $M×1$, as $${\cal H}=({\cal H}₁ {\cal H}₂ … {\cal H}_R)^{\rm T}.$$  The subvectors are sums of inner products with the components of $|ψ(w)〉$ and $|ψ(z)〉$, as $${\cal H}_m=∑_n{\cal H}_{mn}=∑_n〈Dψ₀(w_m)|\bigl(|ψ₀(w_n)〉-(1-iHδt/\hbar)|ψ₀(z_n)〉\bigr).$$  Finally, we can split ${\cal H}_{mn}={\cal A}_{mn}-{\cal B}_{mn}-{\cal C}_{mn}$ into three terms, $${\cal A}_{mn}=〈Dψ₀(w_m)|ψ₀(w_n)〉,$$ $${\cal B}_{mn}=〈Dψ₀(w_m)|ψ₀(z_n)〉,$$ and $${\cal C}_{mn}=-iδt/\hbar〈Dψ₀(w_m)|H|ψ₀(z_n)〉.$$  Note that ${\cal A}_{mn}$ and ${\cal B}_{mn}$ are very similar.  In fact, they are the first column of the $\cal V$ matrix from the simpler problem, except that in $\cal B$ the $φ$ and $α$ variables come from $z$ while $φ*$ and $α*$ come from $w$. This is also the only difference between ${\cal C}_{mn}$ and the ${\cal H}_{mn}$ of the simple problem.  So we already know how to calculate these.
+
+$${\cal A}_{mn}=\pmatrix{1\cr α_n+δα_n}ρ_{mn}$$
+$${\cal B}_{mn}=\pmatrix{1\cr α_n}ρ'_{mn}$$
+$${\cal H}_{mn}=\pmatrix{H_{mn}\cr H_{mn}+i\hbar\dot{a}_{mn}}ρ'_{mn},$$
+where
+$$ρ_{mn}=\exp\bigl(φ*_m+δφ*_m+φ_n+δφ_n+(α*_m+δα*_m)(α_n+δα_n)\bigr),$$
+$$ρ'_{mn}=\exp\bigl(φ*_m+δφ*_m+φ_n+(α*_m+δα*_m)α_n\bigr),$$
+$$H_{mn}=〈ψ₀(w_m)|H|ψ₀(z_m)〉/ρ'_{mn},$$
+$$i\hbar\dot{a}_{mn}=〈ψ₀(w_m)|[a,H]|ψ₀(z_m)〉/ρ'_{mn}.$$
+Before computing this, we would cancel the terms of $$\pmatrix{1\cr α_n}\exp(φ*_m+φ_n+α*_mα_n)$$ in $\cal A$ and $\cal B$, and evaluate the resulting $1-\exp(δ⋯)$ with care.
+
+\bye
