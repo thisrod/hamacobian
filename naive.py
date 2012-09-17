@@ -3,7 +3,8 @@
 #
 # Convention: f stores a column vector of phis, A stores a matrix whose rows are alpha vectors.
 
-from numpy import array, matrix, empty, exp, sum
+from numpy import array, matrix, empty, sqrt, exp, sum, vander
+from scipy.misc import factorial
 
 	
 def extract(z):
@@ -17,6 +18,14 @@ def rho(z, w):
 	assert nl == nr and ml == mr
 	logrho = fl.H + fr + Ar*Al.H
 	return exp(logrho)
+
+def jlft(z, rho):
+	"""Calculate the product of the Jacobian bra matrix with the state.  Limited to one mode."""
+	n, m, f, a = extract(matrix(z))
+	Q = empty((2*n,1))
+	Q[0:2*n:2,:] = sum(rho, 1)
+	Q[1:2*n:2,:] = rho*a
+	return Q
 	
 def jsq(z, rho):
 	"Nothing"
@@ -47,10 +56,15 @@ def jham(z, h, rho):
 	"""Calculate the Hamiltonian bracket in the Levenberg-Marquardt H, between amplitudes z and z+h.
 	rho gives the inner products between states <z+h| and |z>"""
 
-def jlft(z, rho):
-	"""Calculate the product of the Jacobian bra matrix with the state.  Limited to one mode."""
-	n, m, f, a = extract(matrix(z))
+def jfock(z, cs):
+	"Calculate the bracket between the Jacobian and a ket expanded over Fock states.  The Fock amplitudes should be a 1D ndarray."
+	n, m, f, a = extract(z)
 	Q = empty((2*n,1))
-	Q[0:2*n:2,:] = sum(rho, 1)
-	Q[1:2*n:2,:] = rho*a
+	# the Python monkeys got the columns of Vandermonde matrices backwards, so arrays of coefficients go backwards too.
+	evens = cs/sqrt(factorial(xrange(cs.size)))
+	Q[0:2*n:2,:] = vander(a[:,0], evens.size)*matrix(evens).T
+	odds = cs[1:]*sqrt(xrange(1,cs.size)/factorial(xrange(cs.size-1)))
+	evens = evens[::-1]
+	Q[1:2*n:2,:] = vander(a[:,0], odds.size)*matrix(odds).T
+	Q = array(Q)*exp(f.conjugate()).repeat(2,axis=0)
 	return Q
