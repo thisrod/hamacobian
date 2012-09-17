@@ -1,23 +1,21 @@
-# Numerical experiments in how badly the terms of Q cancel
+# How closely can a superposition of two coherent states fit the cat state halfway between quartic oscillator revivials?  Print the overlap, for amplitudes of the cat state close to 2.
 
 from plot import plotens
 from naive import jlft, jfock, rho
-from numpy import array, zeros, log, sum
-
+from numpy import array, zeros, log, sum, exp, sqrt, linspace
+from scipy.misc import factorial
 
 def lnorm(z):
 	return 0.5*log(sum(rho(z,z)))
 
-z = array([[0, 1.8], [0, 2.2]])
-for n in xrange(z.shape[0]):
-	z[n,0] = -lnorm(z[n:n+1,:])
-z[:,0] -= lnorm(z)
+alpha = 2+0j
+n = array(xrange(15))
+cat = (-1)**(n*(n-1)/2) * exp(-0.5*abs(alpha)**2) * alpha**n / sqrt(factorial(n))
 
-print z
+for x in linspace(1.8, 2.2, 10):
+	zs = array([[0, x*1j], [0, -x*1j]])
+	zs[:,0] -= lnorm(zs)
+	bkts = jfock(zs, cat)
+	print x, bkts[0,0] + bkts[2,0]
 
 # plotens(z)
-
-four = zeros(5);  four[4] = 1;
-
-print jlft(z, rho(z,z))
-print jfock(z, four)  # |4>
