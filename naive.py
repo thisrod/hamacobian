@@ -62,9 +62,10 @@ def jfock(z, cs):
 	Q = empty((2*n,1))
 	# the Python monkeys got the columns of Vandermonde matrices backwards, so arrays of coefficients go backwards too.
 	evens = cs/sqrt(factorial(xrange(cs.size)))
-	Q[0:2*n:2,:] = vander(a[:,0], evens.size)*matrix(evens).T
-	odds = cs[1:]*sqrt(xrange(1,cs.size)/factorial(xrange(cs.size-1)))
 	evens = evens[::-1]
-	Q[1:2*n:2,:] = vander(a[:,0], odds.size)*matrix(odds).T
+	Q[0:2*n:2,:] = vander(a.conjugate()[:,0], evens.size)*matrix(evens).T
+	odds = cs[1:]*sqrt(xrange(1,cs.size)/factorial(xrange(cs.size-1)))
+	odds = odds[::-1]
+	Q[1:2*n:2,:] = vander(a.conjugate()[:,0], odds.size)*matrix(odds).T
 	Q = array(Q)*exp(f.conjugate()).repeat(2,axis=0)
 	return Q
