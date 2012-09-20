@@ -6,6 +6,7 @@ from numpy import array, zeros, identity, log, sum, exp, sqrt, linspace
 from numpy.linalg import solve as gesv
 from scipy.misc import factorial
 from levenmarq import *
+import matplotlib.pyplot as plt
 	
 alpha = 2+0j
 n = array(xrange(20))
@@ -15,34 +16,32 @@ original /= sqrt(sum(original**2))
 # coefficients of the halfway state expanded over Fock states
 halfway = (-1)**(n*(n-1)/2) * original
 
-set_target(original)
-print "Fitting a coherent state to the expansion of |2+0j>"
-print "eps  alpha  norm  residual   (ten steps)"
-for epsilon in [0.115, 0.12, 0.15, 0.2, 0.3, 0.5, 1, 2]:
-	zs = array([[0, 1.8]])
-	zs[:,0] -= 0.5*lnormsq(zs)
-	for i in xrange(10):
-		zs, epsilon = lmstep(zs, epsilon)
-	print "%.3f   %.2f    %.2f    %.0e" % (epsilon, zs[0,1], exp(0.5*lnormsq(zs)), sqrt(residual(zs)))
+def tabulate(z, epsilons, steps):
+	results = {}
+	for eps in epsilons:
+		zs = array(z)
+		zs[:,0] -= 0.5*lnormsq(zs)
+		for i in xrange(steps):
+			zs, whatever = lmstep(zs, eps)
+		results[eps] = sqrt(residual(zs))
+	return results
 	
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.set_yscale('log')
+plt.title("Convergence using Levenberg-Marquardt with fixed trust region")
+plt.xlabel("Reciprocal trust region, epsilon")
+plt.ylabel("Residual after 10 steps")
+	
+set_target(original)
+A = tabulate([[0, 1.8]], [0.12, 0.15, 0.2, 0.3, 0.5, 1, 2], 10)
 set_target(halfway)
-print
-print "Fitting two coherent states to the corresponding halfway state"
-print "eps  norm  residual   (ten steps)"
-for epsilon in [0.493, 0.495, 0.5, 1, 1.5, 2, 5, 50, 100]:
-	zs = array([[0, 1.8j], [0, -1.8j]])
-	zs[:,0] -= 0.5*lnormsq(zs)
-	for i in xrange(10):
-		zs, epsilon = lmstep(zs, epsilon)
-	print "%.3f    %.2f    %.0e" % (epsilon, exp(0.5*lnormsq(zs)), sqrt(residual(zs)))
+B = tabulate([[0, 1.8j], [0, -1.8j]], [0.493, 0.495, 0.5, 1, 1.5, 1.7, 2.5], 10)
+C= tabulate([[0, 0.2+2j], [0, -0.2+2j], [0, 0.2-2j], [0, -0.2-2j]],
+			 [1.185, 1.2, 1.25, 1.3, 1.5, 2, 3], 10)
 
-print
-print "Fitting four coherent states to the halfway state"
-print "eps  norm  residual   (ten steps)"
-for epsilon in [1.185, 1.2, 1.25, 1.3, 1.5, 2, 5, 50, 100]:
-	zs = array([[0, 0.2+2j], [0, -0.2+2j], [0, 0.2-2j], [0, -0.2-2j]])
-	zs[:,0] -= 0.5*lnormsq(zs)
-	for i in xrange(10):
-		zs, epsilon = lmstep(zs, epsilon)
-	print "%.3f    %.2f    %.0e" % (epsilon, exp(0.5*lnormsq(zs)), sqrt(residual(zs)))
-
+ax.plot(A.keys(), A.values(), "o", label = "1 ket to |2+0j>")
+ax.plot(B.keys(), B.values(), "*", label = "2 kets to cat")
+ax.plot(C.keys(), C.values(), "D", label = "4 kets to cat")
+plt.legend()
+plt.show()
