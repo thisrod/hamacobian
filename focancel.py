@@ -14,12 +14,14 @@ original /= sqrt(sum(original**2))
 # coefficients of the halfway state expanded over Fock states
 halfway = (-1)**(n*(n-1)/2) * original
 
+target = original
+
 def lnormsq(z):
 	return log(sum(rho(z,z))).real
 	
 def residual(z):
-	"squared Hilbert space distance between the ensemble z and the original state"
-	bkts = jfock(z, halfway)
+	"squared Hilbert space distance between the ensemble z and the target state"
+	bkts = jfock(z, target)
 	return 1 + exp(lnormsq(z)) - 2*sum(bkts[::2]).real
 
 def tikstep(A, y, epsilon):
@@ -30,16 +32,16 @@ def tikstep(A, y, epsilon):
 def lmstep(z, epsilon):
 	"update the guess or the confidence interval.  in this version, we keep epsilon fixed and return the linear guess."
 	r = rho(z,z)
-	V = jsq(z, rho)
-	rhs = jlft(z, rho) - jfock(z, halfway)
-	return tikstep(V, rhs, epsilon), epsilon
+	V = jsq(z, r)
+	rhs = jfock(z, target) - jlft(z, r)
+	return z+tikstep(V, rhs, epsilon).reshape(z.shape), epsilon
 		
-	
-
-for x in linspace(1.8, 2.2, 11):
-	zs = array([[0, x*1j], [0, -x*1j]])
-	# zs = array([[0, x]])
-	zs[:,0] -= 0.5*lnormsq(zs)
-	print "%.2f    %.5f" % (x, sqrt(residual(zs)))
+zs = array([[0, 1.8]])
+zs[:,0] -= 0.5*lnormsq(zs)
+print "alpha  norm  residual"
+print "%.3f    %.3g    %.3g" % (zs[0,1], exp(0.5*lnormsq(zs)), sqrt(residual(zs)))epsilon = 0.1
+for i in xrange(10):
+	zs, epsilon = lmstep(zs, epsilon)
+	print "%.3f    %.3g    %.3g" % (zs[0,1], exp(0.5*lnormsq(zs)), sqrt(residual(zs)))
 
 # plotens(zs)

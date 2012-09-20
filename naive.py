@@ -25,7 +25,7 @@ def jlft(z, rho):
 	Q = empty((2*n,1))
 	Q[0:2*n:2,:] = sum(rho, 1)
 	Q[1:2*n:2,:] = rho*a
-	return Q
+	return Q.reshape((Q.size,))
 	
 def jsq(z, rho):
 	"Nothing"
