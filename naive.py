@@ -68,4 +68,4 @@ def jfock(z, cs):
 	odds = odds[::-1]
 	Q[1:2*n:2,:] = vander(a.conjugate()[:,0], odds.size)*matrix(odds).T
 	Q = array(Q)*exp(f.conjugate()).repeat(2,axis=0)
-	return Q
+	return Q.reshape((Q.size,))
