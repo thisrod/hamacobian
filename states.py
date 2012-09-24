@@ -1,7 +1,7 @@
 # Linear combinations of coherent states, and their moments.
 
-from numpy import ndarray, array, empty, zeros, diag, dot, exp, sum
-from math import sqrt
+from numpy import ndarray, array, empty, diag, dot, vander, exp, sqrt, sum
+from scipy.misc import factorial
 	
 def lccs(*args):
 	"lccs(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s), returns the state object."
@@ -65,7 +65,6 @@ class LccState(KetRow):
 		self.z[:,1:] = a
 		
 	def D(self):
-		"my derivative"
 		return DLccState(self)
 		
 	def __mul__(self, other):
@@ -135,6 +134,9 @@ class NState(KetRow):
 		
 	def __mul__(self, other):
 		return other.mulN(self)
+		
+	def D(self):
+		return self
 
 	def mulN(self, other):
 		x = other.cs.conjugate()
@@ -146,8 +148,25 @@ class NState(KetRow):
 		return result[:len(self), :len(other)]
 
 	def mulL(self, other):
-		raise NotImplementedError, "Not yet"
+		if wid(other) > 2:
+			raise NotImplementedError, "Not yet needed"
+		ns = col(xrange(len(self)))
+		result = empty((len(self), len(other)), dtype=complex)
+		result[::-1,:] = vander(other.a.conjugate()[:,0], len(self)).T
+		result /= col(self.cs)*sqrt(factorial(ns))
+		result *= row(exp(other.f))
+		return result
 				
 	def mulD(self, other):
-		raise NotImplementedError, "Not yet"
-
+		# the Python monkeys got the columns of Vandermonde matrices backwards
+		if wid(other) > 2:
+			raise NotImplementedError, "Not yet needed"
+		ns = col(xrange(1,len(self)))
+		result = empty((len(self), 2*len(other)), dtype=complex)
+		result[:, 0::2] = other*self
+		r = result[:,1::2]
+		r[0,:] = 0
+		r[:0:-1,:] = vander(other.a.conjugate()[:,0], len(self)-1).T
+		r[1::,:] *= sqrt(ns/factorial(ns-1))
+		r *= row(exp(other.f))
+		return result
