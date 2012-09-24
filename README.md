@@ -7,3 +7,15 @@ The first function, rho, should calculate a matrix of brackets between the state
 The test system has three routines, test_rho, test_jsq, and test_jham.  Each of these takes a set of routines to test, and a generator to produce test superpositions.  The test functions return if everything works, and raise an exception if the routines fail some invariant that they should satisfy.
 
 The unit plot.py generates Metapost plots of ensemble amplitudes.  plot.mp contains most of the Metapost code; it is included in the code generated.
+
+Numerical experiments
+------------------
+
+|fixstep.py| demonstrates the failure of ensembles of coherent states to converge to a target state, using Levenberg-Marquardt, except in trivial cases.
+
+|fock.py| solves linear least squares problems in a finite dimensional Fock space, and compares the results to solutions using the normal equations in the tangent space to G<sup>R</sup>.
+
+Numpy style
+----------
+
+Everything is an |ndarray|; vectors are 1-dimensional; matrix products use dot.
