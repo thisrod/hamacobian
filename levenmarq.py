@@ -1,22 +1,18 @@
 # Functions for Levenberg-Marquardt optimisation
 
-from moments import jn, jsq, jlft, rho
-from numpy import array, matrix, zeros, identity, log, sum, exp, sqrt, linspace
+from states import lccs, NState
+from numpy import array, identity, log, sum, exp
 from numpy.linalg import solve as gesv
 
-target = None
+target = None		# NState to approximate
 
 def set_target(x):
 	global target
-	target = matrix(x.reshape((x.size, 1)))
-
-def lnormsq(z):
-	return log(sum(rho(z,z))).real
+	target = x
 
 def residual(z):
 	"squared Hilbert space distance between the ensemble z and the target state"
-	bkts = jn(z, target.size) * target
-	return 1 + exp(lnormsq(z)) - 2*sum(bkts[:,::2]).real
+	return 1 + z.norm()**2 - 2*sum(z*target).real
 
 def tikstep(A, y, epsilon):
 	"The Tikhonov solution to Ax=y, with regularisation parameter epsilon"
@@ -25,8 +21,8 @@ def tikstep(A, y, epsilon):
 	
 def lmstep(z, epsilon):
 	"update the guess or the confidence interval.  in this version, we keep epsilon fixed and return the linear guess."
-	r = rho(z,z)
-	V = jsq(z, r)
-	rhs = jn(z, target.size) * target - jlft(z, r)
+	j = z.D()
+	V = j*j
+	rhs = sum(j*target) - sum(j*z)
 	return z+array(tikstep(V, rhs, epsilon)).reshape(z.shape), epsilon
 		
