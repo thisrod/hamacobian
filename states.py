@@ -1,6 +1,6 @@
 # Linear combinations of coherent states, and their moments.
 
-from numpy import array, empty, zeros, dot, exp
+from numpy import array, empty, zeros, dot, exp, sum
 	
 def lccs(*args):
 	"lccs(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s), returns the state object."
@@ -17,7 +17,14 @@ def lccs(*args):
 	return instance
 
 class KetRow(object):
-	pass
+	
+	def similar(self, other):
+		return type(self) is type(other) and
+			len(self) == len(other) and
+			wid(self) == wid(other)
+			
+	def norm(self):
+		return sqrt(sum(self*self))
 
 def wid(s):
 	return s.__wid__()
@@ -55,10 +62,6 @@ class LccState(KetRow):
 		
 	def seta(self, a):
 		self.z[:,1:] = a
-		
-	def similar(self, w):
-		"do I have the same number of modes and components as w?"
-		return self.n == w.n and self.m == w.m
 		
 	def D(self):
 		"my derivative"
