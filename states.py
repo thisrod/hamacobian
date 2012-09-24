@@ -63,24 +63,22 @@ class LccState(object):
 		return exp(row(other.f) + col(self.f) + dot(self.a, hc(other.a)))
 		
 	def mulD(self, other):
-		# jlft operation
-		raise NotImplementedError, "Not yet"
-		
+		pass		
 
 class DLccState(object):
 	"the total derivative of an LccState wrt z.  forms products with states and number state vectors as 2D arrays."
 
 	def __init__(self, state):
-		self.Q = state
+		self.state = state
 		
 	def __mul__(self, other):
-		return other.mulD(self)
+		return other.mulD(self.state)
 		
 	def mulD(self, other):
 		# V matrix, <other|self>
-		if other.Q is not self.Q:
+		if other is not self.state:
 			raise NotImplementedError, "Not yet needed"
-		Q = self.Q
+		Q = self.state
 		n = Q.n
 		m = Q.m
 		rho = (Q*Q).repeat(m,0).repeat(m,1)
@@ -91,3 +89,20 @@ class DLccState(object):
 		for i in xrange(1,m):
 			poly[i:n:n*m,i:n:n*m] += 1
 		return poly*rho
+
+
+class NState(object):
+	"a state expanded over Fock states."
+	
+	def __init__(self, cs):
+		"cs are the coefficients, starting with |0>"
+		self.cs = cs
+		
+	def __mul__(self, other):
+		return other.mulN(self)
+				
+	def mulL(self, other):
+		raise NotImplementedError, "Not yet"
+				
+	def mulD(self, other):
+		raise NotImplementedError, "Not yet"
