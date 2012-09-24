@@ -63,7 +63,14 @@ class LccState(object):
 		return exp(row(other.f) + col(self.f) + dot(self.a, hc(other.a)))
 		
 	def mulD(self, other):
-		pass		
+		# <D other|self>
+		if self.m > 2 or self is not other:
+			raise NotImplementedError, "Not yet needed"
+		Q = empty((2*self.n,))
+		rho = other*self
+		Q[0:2*n:2] = sum(rho, 1)
+		Q[1:2*n:2] = dot(rho, self.a)
+		return Q
 
 class DLccState(object):
 	"the total derivative of an LccState wrt z.  forms products with states and number state vectors as 2D arrays."
