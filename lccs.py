@@ -50,15 +50,17 @@ class LccState(object):
 		"do I have the same number of modes and components as w?"
 		return self.n == w.n and self.m == w.m
 		
-	def D():
+	def D(self):
 		"my derivative"
 		return DLccState(self)
 		
-	def rho(self, w=None):
-		"""the array of inner products between the components of self and w."""
-		if w is None: w = self
-		assert self.similar(w)
-		return exp(row(self.f) + col(w.f) + dot(w.a, hc(self.a)))
+	def __mul__(self, other):
+		return other.mulLccState(self)
+		
+	def mulLccState(self, other):
+		# other * self
+		assert self.similar(other)
+		return exp(row(other.f) + col(self.f) + dot(self.a, hc(other.a)))
 		
 
 class DLccState(object):
