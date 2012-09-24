@@ -1,18 +1,6 @@
 # Linear combinations of coherent states, and their moments.
 
 from numpy import array, empty, zeros, dot, exp
-
-def col(x):
-	"Cast a 1D array to a column"
-	return array(x, copy=True, ndmin=2).T
-
-def hc(A):
-	"our very own Hermitian conjugate function.  hooray for Numpy!"
-	return A.conjugate().T
-
-def row(x):
-	"Cast a 1D array to a row, taking the complex conjugate"
-	return hc(col(x))
 	
 def lccs(*args):
 	"lccs(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s), returns the state object."
@@ -27,18 +15,40 @@ def lccs(*args):
 	instance.setf(args[0::2])
 	instance.seta(ain)
 	return instance
-	
+
+class KetRow(object):
+	pass
+
+def wid(s):
+	return s.__wid__()
+
+def col(x):
+	"Cast a 1D array to a column"
+	return array(x, copy=True, ndmin=2).T
+
+def hc(A):
+	"our very own Hermitian conjugate function.  hooray for Numpy!"
+	return A.conjugate().T
+
+def row(x):
+	"Cast a 1D array to a row, taking the complex conjugate"
+	return hc(col(x))
 
 
-class LccState(object):
+class LccState(KetRow):
 	"A linear combination of coherent states."
 
 	def __init__(self, z):
 		"z must be an ndarray"
-		self.n, self.m = z.shape
 		self.z = z
 		self.f = z[:,0]
 		self.a = z[:,1:]
+		
+	def __len__(self):
+		return self.z.shape[0]
+		
+	def __wid__(self):
+		return self.z.shape[1]
 		
 	def setf(self, f):
 		self.z[:,0] = f
@@ -72,11 +82,17 @@ class LccState(object):
 		Q[1:2*n:2] = dot(rho, self.a)
 		return Q
 
-class DLccState(object):
+class DLccState(KetRow):
 	"the total derivative of an LccState wrt z.  forms products with states and number state vectors as 2D arrays."
 
 	def __init__(self, state):
 		self.state = state
+		
+	def __len__(self):
+		return len(self.state)*wid(self.state)
+		
+	def __wid__(self):
+		return 0
 		
 	def __mul__(self, other):
 		return other.mulD(self.state)
@@ -98,12 +114,18 @@ class DLccState(object):
 		return poly*rho
 
 
-class NState(object):
+class NState(KetRow):
 	"a state expanded over Fock states."
 	
 	def __init__(self, cs):
 		"cs are the coefficients, starting with |0>"
 		self.cs = cs
+		
+	def __len__(self):
+		return cs.shape[0]
+		
+	def __wid__(self):
+		return 1
 		
 	def __mul__(self, other):
 		return other.mulN(self)
