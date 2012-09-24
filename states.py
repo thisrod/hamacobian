@@ -1,6 +1,7 @@
 # Linear combinations of coherent states, and their moments.
 
-from numpy import array, empty, zeros, dot, exp, sum
+from numpy import ndarray, array, empty, zeros, diag, dot, exp, sum
+from math import sqrt
 	
 def lccs(*args):
 	"lccs(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s), returns the state object."
@@ -19,12 +20,12 @@ def lccs(*args):
 class KetRow(object):
 	
 	def similar(self, other):
-		return type(self) is type(other) and
-			len(self) == len(other) and
+		return type(self) is type(other) and \
+			len(self) == len(other) and \
 			wid(self) == wid(other)
 			
 	def norm(self):
-		return sqrt(sum(self*self))
+		return sqrt(sum(self*self).real)
 
 def wid(s):
 	return s.__wid__()
@@ -46,7 +47,7 @@ class LccState(KetRow):
 	"A linear combination of coherent states."
 
 	def __init__(self, z):
-		"z must be an ndarray"
+		assert type(z) is ndarray and len(z.shape) == 2
 		self.z = z
 		self.f = z[:,0]
 		self.a = z[:,1:]
@@ -77,9 +78,9 @@ class LccState(KetRow):
 		
 	def mulD(self, other):
 		# <D other|self>
-		if self.m > 2 or self is not other:
+		if wid(self) > 2 or self is not other:
 			raise NotImplementedError, "Not yet needed"
-		Q = empty((2*self.n,))
+		Q = empty((2*len(self),))
 		rho = other*self
 		Q[0:2*n:2] = sum(rho, 1)
 		Q[1:2*n:2] = dot(rho, self.a)
@@ -95,6 +96,7 @@ class DLccState(KetRow):
 		return len(self.state)*wid(self.state)
 		
 	def __wid__(self):
+		# No adjustable parameters
 		return 0
 		
 	def __mul__(self, other):
@@ -104,11 +106,11 @@ class DLccState(KetRow):
 		# V matrix, <other|self>
 		if other is not self.state:
 			raise NotImplementedError, "Not yet needed"
-		Q = self.state
-		n = Q.n
-		m = Q.m
-		rho = (Q*Q).repeat(m,0).repeat(m,1)
-		w = Q.z.copy()
+		Z = self.state
+		n = len(Z)
+		m = wid(Z)
+		rho = (Z*Z).repeat(m,0).repeat(m,1)
+		w = Z.z.copy()
 		w[:,0] = 1
 		w = w.reshape(-1,1)
 		poly = dot(w, hc(w))
@@ -122,10 +124,11 @@ class NState(KetRow):
 	
 	def __init__(self, cs):
 		"cs are the coefficients, starting with |0>"
-		self.cs = cs
+		self.cs = array(cs, dtype=complex)
+		assert self.cs.ndim == 1
 		
 	def __len__(self):
-		return cs.shape[0]
+		return self.cs.shape[0]
 		
 	def __wid__(self):
 		return 1
@@ -134,7 +137,13 @@ class NState(KetRow):
 		return other.mulN(self)
 
 	def mulN(self, other):
-		result = zeros((len(self.cs), len(other.cs)))
+		x = other.cs.conjugate()
+		y = self.cs.copy()
+		if y.size > x.size:
+			x, y = y, x
+		x[:y.size] *= y
+		result = diag(x)
+		return result[:len(self), :len(other)]
 
 	def mulL(self, other):
 		raise NotImplementedError, "Not yet"
