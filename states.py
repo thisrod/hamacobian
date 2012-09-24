@@ -1,6 +1,6 @@
 # Linear combinations of coherent states, and their moments.
 
-from numpy import array, empty, dot, exp
+from numpy import array, empty, zeros, dot, exp
 
 def col(x):
 	"Cast a 1D array to a column"
@@ -107,9 +107,13 @@ class NState(object):
 		
 	def __mul__(self, other):
 		return other.mulN(self)
-				
+
+	def mulN(self, other):
+		result = zeros((len(self.cs), len(other.cs)))
+
 	def mulL(self, other):
 		raise NotImplementedError, "Not yet"
 				
 	def mulD(self, other):
 		raise NotImplementedError, "Not yet"
+
