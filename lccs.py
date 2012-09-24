@@ -55,12 +55,16 @@ class LccState(object):
 		return DLccState(self)
 		
 	def __mul__(self, other):
-		return other.mulLccState(self)
+		return other.mulL(self)
 		
-	def mulLccState(self, other):
+	def mulL(self, other):
 		# other * self
 		assert self.similar(other)
 		return exp(row(other.f) + col(self.f) + dot(self.a, hc(other.a)))
+		
+	def mulD(self, other):
+		# jlft operation
+		raise NotImplementedError, "Not yet"
 		
 
 class DLccState(object):
@@ -68,3 +72,22 @@ class DLccState(object):
 
 	def __init__(self, state):
 		self.Q = state
+		
+	def __mul__(self, other):
+		return other.mulD(self)
+		
+	def mulD(self, other):
+		# V matrix, <other|self>
+		if other.Q is not self.Q:
+			raise NotImplementedError, "Not yet needed"
+		Q = self.Q
+		n = Q.n
+		m = Q.m
+		rho = (Q*Q).repeat(m,0).repeat(m,1)
+		w = Q.z.copy()
+		w[:,0] = 1
+		w = w.reshape(-1,1)
+		poly = dot(w, hc(w))
+		for i in xrange(1,m):
+			poly[i:n:n*m,i:n:n*m] += 1
+		return poly*rho
