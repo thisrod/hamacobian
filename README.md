@@ -8,6 +8,18 @@ The test system has three routines, test_rho, test_jsq, and test_jham.  Each of 
 
 The unit plot.py generates Metapost plots of ensemble amplitudes.  plot.mp contains most of the Metapost code; it is included in the code generated.
 
+State objects
+----------
+
+An object of class |KetRow| represents a row vector of kets.  Often, this will represent a state that is the sum of these kets.  The length of these objects is the number of kets; teh |wid| (width) function returns the number of parameters of each ket, which is one for the weight, plus the number of state parameters.
+
+If the individual kets can be represented, iterating over the state returns representations of each component.
+
+When |KetRow|s are multiplied, the one on the left has its Hermitian conjugate taken.  This product is not associative, so pay attention to brackets!  This is implemented by double dispatch.
+
+Taking the deriviative of a |KetRow| returns a vector of derivatives wrt the parameters in the standalone constructor function (not the class constructor).
+
+
 Numerical experiments
 ------------------
 

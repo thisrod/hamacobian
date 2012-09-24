@@ -1,7 +1,7 @@
 # Tests, in the standard unit testing framework.
 
 from unittest import TestCase, main as run_tests
-from naive import *
+from moments import *
 from numpy import array, exp, log, sum, sqrt, allclose, zeros
 from scipy.misc import factorial
 

@@ -1,7 +1,8 @@
 # Using a fixed trust region, see how well a single coherent state coverges to its own expansion
+# Broken: it looks like residual returns complex numbers.
 
 from plot import plotens
-from naive import jsq, jlft, jfock, rho
+from mements import jsq, rho
 from numpy import array, zeros, identity, log, sum, exp, sqrt, linspace, pi
 from numpy.linalg import solve as gesv
 from scipy.misc import factorial
