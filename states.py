@@ -3,19 +3,6 @@
 from numpy import ndarray, array, empty, diag, dot, vander, exp, sqrt, sum
 from scipy.misc import factorial
 	
-def lccs(*args):
-	"lccs(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s), returns the state object."
-	if isinstance(args[1], float):
-		ain = [[z] for z in args[1::2]]
-	else:
-		ain = args[1::2]
-	n = len(args)/2
-	m = len(ain[0])+1
-	z = empty((n, m), dtype=complex)
-	instance = LccState(z)
-	instance.setf(args[0::2])
-	instance.seta(ain)
-	return instance
 
 class KetRow(object):
 	
@@ -46,11 +33,19 @@ def row(x):
 class LccState(KetRow):
 	"A linear combination of coherent states."
 
-	def __init__(self, z):
-		assert type(z) is ndarray and len(z.shape) == 2
-		self.z = z
-		self.f = z[:,0]
-		self.a = z[:,1:]
+	def __init__(self, *args):
+		"LccState(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s)."
+		if isinstance(args[1], float):
+			ain = [[x] for x in args[1::2]]
+		else:
+			ain = args[1::2]
+		n = len(args)/2
+		m = len(ain[0])+1
+		self.z = empty((n, m), dtype=complex)
+		self.f = self.z[:,0]
+		self.a = self.z[:,1:]
+		self.setf(args[0::2])
+		self.seta(ain)
 		
 	def __len__(self):
 		return self.z.shape[0]
@@ -65,7 +60,12 @@ class LccState(KetRow):
 		self.z[:,1:] = a
 		
 	def D(self):
-		return DLccState(self)
+		return DLccState().be(self)
+		
+	def __add__(self, z):
+		result = LccState(*z)
+		result.z += self.z
+		return result
 		
 	def __mul__(self, other):
 		return other.mulL(self)
@@ -88,7 +88,7 @@ class LccState(KetRow):
 class DLccState(KetRow):
 	"the total derivative of an LccState wrt z.  forms products with states and number state vectors as 2D arrays."
 
-	def __init__(self, state):
+	def be(self, state):
 		self.state = state
 		
 	def __len__(self):
