@@ -2,6 +2,7 @@
 
 from numpy import ndarray, array, empty, diag, dot, vander, exp, sqrt, sum
 from scipy.misc import factorial
+import numbers
 	
 
 class KetRow(object):
@@ -17,17 +18,17 @@ class KetRow(object):
 def wid(s):
 	return s.__wid__()
 
+# columns of bras need conjugate parameters.  thus col must make a copy; for consistency, row does too.
+
 def col(x):
-	"Cast a 1D array to a column"
-	return array(x, copy=True, ndmin=2).T
+	return hc(row(x))
 
 def hc(A):
 	"our very own Hermitian conjugate function.  hooray for Numpy!"
 	return A.conjugate().T
 
 def row(x):
-	"Cast a 1D array to a row, taking the complex conjugate"
-	return hc(col(x))
+	return array(x, copy=True, ndmin=2)
 
 
 class LccState(KetRow):
@@ -35,7 +36,8 @@ class LccState(KetRow):
 
 	def __init__(self, *args):
 		"LccState(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s)."
-		if isinstance(args[1], float):
+		# Use copy construction if efficiency matters
+		if isinstance(args[1], numbers.Complex):
 			ain = [[x] for x in args[1::2]]
 		else:
 			ain = args[1::2]
@@ -60,7 +62,9 @@ class LccState(KetRow):
 		self.z[:,1:] = a
 		
 	def D(self):
-		return DLccState().be(self)
+		result = DLccState()
+		result.be(self)
+		return result
 		
 	def __add__(self, z):
 		result = LccState(*z)
@@ -70,7 +74,7 @@ class LccState(KetRow):
 	def __mul__(self, other):
 		return other.mulL(self)
 		
-	def mulL(self, other):
+	def mulL(self, other):		# FIXME
 		# other * self
 		assert self.similar(other)
 		return exp(row(other.f) + col(self.f) + dot(self.a, hc(other.a)))
@@ -81,8 +85,8 @@ class LccState(KetRow):
 			raise NotImplementedError, "Not yet needed"
 		Q = empty((2*len(self),))
 		rho = other*self
-		Q[0:2*n:2] = sum(rho, 1)
-		Q[1:2*n:2] = dot(rho, self.a)
+		Q[0::2] = sum(rho, 1)
+		Q[1::2] = dot(rho, self.a)
 		return Q
 
 class DLccState(KetRow):
@@ -121,7 +125,7 @@ class DLccState(KetRow):
 class NState(KetRow):
 	"a state expanded over Fock states."
 	
-	def __init__(self, cs):
+	def __init__(self, *cs):
 		"cs are the coefficients, starting with |0>"
 		self.cs = array(cs, dtype=complex)
 		assert self.cs.ndim == 1
@@ -150,11 +154,10 @@ class NState(KetRow):
 	def mulL(self, other):
 		if wid(other) > 2:
 			raise NotImplementedError, "Not yet needed"
-		ns = col(xrange(len(self)))
-		result = empty((len(self), len(other)), dtype=complex)
-		result[::-1,:] = vander(other.a.conjugate()[:,0], len(self)).T
-		result /= col(self.cs)*sqrt(factorial(ns))
-		result *= row(exp(other.f))
+		n = len(self)
+		result = vander(col(other.a).flatten(), n)[:,::-1]
+		result *= row(self.cs)/sqrt(factorial(xrange(n)))
+		result *= col(exp(other.f))
 		return result
 				
 	def mulD(self, other):
@@ -167,6 +170,13 @@ class NState(KetRow):
 		r = result[:,1::2]
 		r[0,:] = 0
 		r[:0:-1,:] = vander(other.a.conjugate()[:,0], len(self)-1).T
-		r[1::,:] *= sqrt(ns/factorial(ns-1))
+		r[1::,:] *= col(self.cs[1::])*sqrt(ns/factorial(ns-1))
 		r *= row(exp(other.f))
 		return result
+
+# Test data
+
+glauber = LccState(0, 1.8)
+basis = NState(*[1]*15)
+# fock = NState(*glauber*basis)  NYI
+fock = NState(*(glauber*basis).flatten().conj())
