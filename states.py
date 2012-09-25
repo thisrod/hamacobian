@@ -33,6 +33,8 @@ def row(x):
 
 class LccState(KetRow):
 	"A linear combination of coherent states."
+	
+	# f is row of log weights, and a is a matrix whose columns are vector ampltiudes.  these shapes fit a row of kets.
 
 	def __init__(self, *args):
 		"LccState(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s)."
@@ -43,23 +45,24 @@ class LccState(KetRow):
 			ain = args[1::2]
 		n = len(args)/2
 		m = len(ain[0])+1
-		self.z = empty((n, m), dtype=complex)
-		self.f = self.z[:,0]
-		self.a = self.z[:,1:]
+		self.z = empty((m,n), dtype=complex)
+		self.f = self.z[0:1,:]
+		self.a = self.z[1:,:]
 		self.setf(args[0::2])
 		self.seta(ain)
 		
 	def __len__(self):
-		return self.z.shape[0]
-		
-	def __wid__(self):
 		return self.z.shape[1]
 		
+	def __wid__(self):
+		return self.z.shape[0]
+		
 	def setf(self, f):
-		self.z[:,0] = f
+		self.z[0:1,:] = f
 		
 	def seta(self, a):
-		self.z[:,1:] = a
+		# This takes amplitude vectors as rows, as does __init__
+		self.z[1:,:] = array(a).T
 		
 	def D(self):
 		result = DLccState()
@@ -74,12 +77,13 @@ class LccState(KetRow):
 	def __mul__(self, other):
 		return other.mulL(self)
 		
-	def mulL(self, other):		# FIXME
+	def mulL(self, other):
 		# other * self
-		assert self.similar(other)
-		return exp(row(other.f) + col(self.f) + dot(self.a, hc(other.a)))
+		if not self.similar(other):
+			raise NotImplementedError, "Not yet needed"
+		return exp(hc(other.f) + self.f + dot(hc(other.a), self.a))
 		
-	def mulD(self, other):
+	def mulD(self, other):		# FIXME
 		# <D other|self>
 		if wid(self) > 2 or self is not other:
 			raise NotImplementedError, "Not yet needed"
@@ -127,11 +131,10 @@ class NState(KetRow):
 	
 	def __init__(self, *cs):
 		"cs are the coefficients, starting with |0>"
-		self.cs = array(cs, dtype=complex)
-		assert self.cs.ndim == 1
+		self.cs = array(cs, dtype=complex, ndmin=2)
 		
 	def __len__(self):
-		return self.cs.shape[0]
+		return self.cs.shape[1]
 		
 	def __wid__(self):
 		return 1
@@ -142,7 +145,7 @@ class NState(KetRow):
 	def D(self):
 		return self
 
-	def mulN(self, other):
+	def mulN(self, other):		# FIXME
 		x = other.cs.conjugate()
 		y = self.cs.copy()
 		if y.size > x.size:
@@ -151,27 +154,28 @@ class NState(KetRow):
 		result = diag(x)
 		return result[:len(self), :len(other)]
 
+		# the Python monkeys got the columns of Vandermonde matrices backwards
+		
 	def mulL(self, other):
 		if wid(other) > 2:
 			raise NotImplementedError, "Not yet needed"
 		n = len(self)
-		result = vander(col(other.a).flatten(), n)[:,::-1]
-		result *= row(self.cs)/sqrt(factorial(xrange(n)))
-		result *= col(exp(other.f))
+		result = vander(hc(other.a).flatten(), n)[:,::-1]
+		result *= self.cs/sqrt(factorial(xrange(n)))
+		result *= hc(exp(other.f))
 		return result
 				
 	def mulD(self, other):
-		# the Python monkeys got the columns of Vandermonde matrices backwards
 		if wid(other) > 2:
 			raise NotImplementedError, "Not yet needed"
-		ns = col(xrange(1,len(self)))
-		result = empty((len(self), 2*len(other)), dtype=complex)
-		result[:, 0::2] = other*self
-		r = result[:,1::2]
-		r[0,:] = 0
-		r[:0:-1,:] = vander(other.a.conjugate()[:,0], len(self)-1).T
-		r[1::,:] *= col(self.cs[1::])*sqrt(ns/factorial(ns-1))
-		r *= row(exp(other.f))
+		ns = row(xrange(1,len(self)))
+		result = empty((2*len(other), len(self)), dtype=complex)
+		result[0::2,:] = other*self
+		r = result[1::2,:]
+		r[:,0] = 0
+		r[:,:0:-1] = vander(hc(other.a).flatten(), len(self)-1)
+		r[:,1::] *= self.cs[:,1::]*sqrt(ns/factorial(ns-1))
+		r *= hc(exp(other.f))
 		return result
 
 # Test data
