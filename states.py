@@ -6,7 +6,7 @@ from copy import copy, deepcopy
 
 ##################################################
 #
-#	Product dispatch system
+#	multiplicative dispatch
 #
 ##################################################
 
@@ -25,6 +25,13 @@ def rmul(self, other):
 		return products[type(self), type(other)](self, other).conj().T
 	else:
 		return NotImplemented
+		
+def div(self, z):
+	if isinstance(z, numbers.Complex):
+		return self.scaled((1+0j)/z)
+	else:
+		return NotImplemented
+	
 	
 	
 ##################################################
@@ -39,19 +46,15 @@ class KetRow(object):
 		return type(self) is type(other) and \
 			len(self) == len(other) and \
 			wid(self) == wid(other)
-			
-	def norm(self):
-		return sqrt(sum(self*self).real)
 		
 	def sum(self):
 		return KetSum(self)
 		
-	__mul__, __rmul__= mul, rmul
+	__mul__, __rmul__, __div__= mul, rmul, div
 	
 
 def wid(s):
 	return s.__wid__()
-	
 	
 class KetSum(object):
 
@@ -61,33 +64,37 @@ class KetSum(object):
 	def expand(self, basis):
 		"basis must be a row of orthonormal kets, but this could be relaxed"
 		return type(basis)(basis*self)
+			
+	def norm(self):
+		return sqrt(sum(self*self).real)
+
+	def normalised(self):
+		return self/self.norm()
 		
 	def _sum_mul(self, other):
 		return sum(self.components * other.components)
 		
 	def _row_mul(self, other):
-		return sum(self.components*other, axis=1)
+		return sum(self.components*other, axis=0)
 		
 	def scaled(self, z):
 		return KetSum(self.components.scaled(z))
 	
-	__mul__, __rmul__= mul, rmul
+	__mul__, __rmul__, __div__= mul, rmul, div
 	
 	
 ##################################################
 #
-#	Specific types of sum
+#	Specific types of row
 #
 ##################################################
 
-class LccState(KetRow):
-	"A linear combination of coherent states."
-	
+class CoherentRow(KetRow):
 	# f is row of log weights, and a is a matrix whose cobrackets.lumns are vector ampltiudes.  these shapes fit a row of kets.
 	# Use copy construction if efficiency matters
 
 	def __init__(self, *args):
-		"LccState(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s)."
+		"CoherentRow(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s)."
 		if isinstance(args[1], numbers.Complex):
 			ain = [[x] for x in args[1::2]]
 		else:
@@ -121,13 +128,13 @@ class LccState(KetRow):
 		result.setz(self.z.copy())
 		return result
 		
-	def normalised(self):
+	def scaled(self, z):
 		result = deepcopy(self)
-		result.f -= log(self.norm())
+		result.f += log(z)
 		return result
 		
 	def D(self):
-		result = DLccState()
+		result = DCoherentRow()
 		result.be(self)
 		return result
 		
@@ -137,8 +144,8 @@ class LccState(KetRow):
 		return result
 		
 
-class DLccState(KetRow):
-	"the total derivative of an LccState wrt z.  forms products with states and number state vectors as 2D arrays."
+class DCoherentRow(KetRow):
+	"the total derivative of an CoherentRow wrt z.  forms products with states and number state vectors as 2D arrays."
 
 	def be(self, state):
 		self.state = state
@@ -151,7 +158,7 @@ class DLccState(KetRow):
 		return 0
 
 
-class NState(KetRow):
+class FockRow(KetRow):
 	"a state expanded over Fock states."
 	
 	def __init__(self, *cs):
@@ -178,5 +185,5 @@ products[KetSum, KetSum] = KetSum._sum_mul
 for T in KetRow.__subclasses__():
 	products[KetSum, T] = KetSum._row_mul
 	
-for Ts, op in combinations(NState, LccState, DLccState):
+for Ts, op in combinations(FockRow, CoherentRow, DCoherentRow):
 	products[Ts] = op

@@ -11,9 +11,9 @@ def expands_to(basis, state, expansion):
 class CoherentTestCase(TestCase):
 	def setUp(self):
 		self.alpha = 3+4j
-		self.glauber = LccState(0, self.alpha).normalised()
-		self.basis = NState(*[1]*15)
-		self.fock = NState(*(self.basis*self.glauber).flatten()).sum()
+		self.glauber = CoherentRow(0, self.alpha).sum().normalised()
+		self.basis = FockRow(*[1]*15)
+		self.fock = FockRow(*(self.basis*self.glauber).flatten()).sum()
 		n = array(xrange(len(self.basis)))
 		self.expansion = exp(-0.5*abs(self.alpha)**2)*self.alpha**n/sqrt(factorial(n))
 		
