@@ -1,28 +1,22 @@
 # Functions for Levenberg-Marquardt optimisation
 
-from states import lccs, NState
+# See states.py for the interface that x and z must implement
 from numpy import array, identity, log, sum, exp
 from numpy.linalg import solve as gesv
-
-target = None		# NState to approximate
 
 def set_target(x):
 	global target
 	target = x
 
 def residual(z):
-	"squared Hilbert space distance between the ensemble z and the target state"
-	return 1 + z.norm()**2 - 2*sum(z*target).real
+	"squared Hilbert space distance between the z and the target state"
+	return target.norm()**2 + z.norm()**2 - 2*(z*target).real
 
 def tikstep(A, y, epsilon):
 	"The Tikhonov solution to Ax=y, with regularisation parameter epsilon"
-	A = A.copy() + epsilon*identity(y.size)
-	return gesv(A, y)
+	return gesv(A + epsilon*identity(y.size), y)
 	
-def lmstep(z, epsilon):
+def step(z, epsilon):
 	"update the guess or the confidence interval.  in this version, we keep epsilon fixed and return the linear guess."
-	j = z.D()
-	V = j*j
-	rhs = sum(j*target) - sum(j*z)
-	return z+array(tikstep(V, rhs, epsilon)).reshape(z.shape), epsilon
-		
+	Dz = z.D()
+	return z + tikstep(Dz*Dz, Dz*target - Dz*z, epsilon), epsilon

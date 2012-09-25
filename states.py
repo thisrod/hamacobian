@@ -71,6 +71,12 @@ class KetSum(object):
 	def normalised(self):
 		return self/self.norm()
 		
+	def D(self):
+		return self.components.D()
+		
+	def __add__(self, dz):
+		return KetSum(self.components+dz)
+		
 	def _sum_mul(self, other):
 		return sum(self.components * other.components)
 		
@@ -140,18 +146,18 @@ class CoherentRow(KetRow):
 		
 	def __add__(self, dz):
 		result = deepcopy(self)
-		result.z += dz
+		result.z += CoherentRow(*dz).z
 		return result
 		
 
 class DCoherentRow(KetRow):
-	"the total derivative of an CoherentRow wrt z.  forms products with states and number state vectors as 2D arrays."
+	"the total derivative of a CoherentRow.sum()"
 
-	def be(self, state):
-		self.state = state
+	def be(self, row):
+		self.components = row
 		
 	def __len__(self):
-		return len(self.state)*wid(self.state)
+		return len(self.components)*wid(self.components)
 		
 	def __wid__(self):
 		# No adjustable parameters
