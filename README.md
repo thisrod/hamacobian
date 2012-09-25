@@ -11,13 +11,17 @@ The unit plot.py generates Metapost plots of ensemble amplitudes.  plot.mp conta
 State objects
 ----------
 
-An object of class |KetRow| represents a row vector of kets.  Often, this will represent a state that is the sum of these kets.  The length of these objects is the number of kets; teh |wid| (width) function returns the number of parameters of each ket, which is one for the weight, plus the number of state parameters.
+An object of class |KetRow| represents a row vector of kets.  The length of these objects is the number of kets; teh |wid| (width) function returns the number of parameters of each ket, which is one for the weight, plus the number of state parameters.
+
+A KetSum represents a state that is the sum of these kets.  It is a ket when on the right of a product, a bra when on the left.
 
 If the individual kets can be represented, iterating over the state returns representations of each component.
 
 When |KetRow|s are multiplied, the one on the left has its Hermitian conjugate taken.  This product is not associative, so pay attention to brackets!  This is implemented by double dispatch.
 
 Taking the deriviative of a |KetRow| returns a vector of derivatives wrt the parameters in the standalone constructor function (not the class constructor).
+
+Adding a 1D array to a state advances the parameters by the array elements.  As usual, the parameter order comes from the standalone constructor.
 
 
 Numerical experiments

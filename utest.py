@@ -1,29 +1,30 @@
 # Tests, in the standard unit testing framework.
 
 from unittest import TestCase, main as run_tests
-from moments import *
+from states import *
 from numpy import array, exp, log, sum, sqrt, allclose, zeros
 from scipy.misc import factorial
 
-def lnorm(z):
-	return 0.5*log(sum(rho(z,z)))
+def expands_to(basis, state, expansion):
+	return allclose((basis*state).flatten(), expansion)
 
-class AmplitudeTwoCase(TestCase):
-	"Set up a normal coherent state, with  real amplitude 2"
+class CoherentTestCase(TestCase):
 	def setUp(self):
-		self.zs = array([[0, 2+0j]])
-		self.zs[0,0] -= lnorm(self.zs)
-		assert lnorm(self.zs) == 0
+		self.alpha = 3+4j
+		self.glauber = LccState(0, self.alpha).normalised()
+		self.basis = NState(*[1]*15)
+		self.fock = NState(*(self.basis*self.glauber).flatten()).sum()
+		n = array(xrange(len(self.basis)))
+		self.expansion = exp(-0.5*abs(self.alpha)**2)*self.alpha**n/sqrt(factorial(n))
 		
-		
-class FockTest(AmplitudeTwoCase):
+class ExpansionTest(CoherentTestCase):
 	def runTest(self):
-		"Verify the expansion of |2+0j> over Fock states."
-		alpha = 2
-		for n in xrange(10):
-			cs = zeros(n+1);  cs[-1] = 1
-			assert allclose(jfock(self.zs, cs)[0,0],
-				exp(-0.5*abs(alpha)**2)*alpha.conjugate()**n/sqrt(factorial(n)))
+		"Verify the expansion of glauber() over Fock states"
+		assert expands_to(self.basis, self.glauber, self.expansion)
+		assert expands_to(self.basis, self.fock, self.expansion)
+		
+class DerivativeTest(CoherentTestCase):
+	pass
 				
 if __name__ == "__main__":
             run_tests()
