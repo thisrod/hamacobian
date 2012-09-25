@@ -1,14 +1,7 @@
-########################################
-#
-#	Product functions
-#
-#	The upper triangle of the DLN matrix is implemented explicitly.
-#	The remainder is done by lum.
-#
-########################################
-
 from numpy import array, empty, diag, vander, exp, sqrt, dot
 from scipy.misc import factorial
+
+# the Python monkeys got the columns of Vandermonde matrices backwards
 
 def hc(A):
 	"our very own Hermitian conjugate function.  hooray for Numpy!"
@@ -16,26 +9,19 @@ def hc(A):
 	
 def wid(x):
 	return x.__wid__()
-	
-# double dispatch: implement other*self
-	
-def lum(self, other):
-	"Do it the other way round, and take the conjugate"
-	return hc(self*other)
 		
 def mulLL(self, other):
 	if not self.similar(other):
 		raise NotImplementedError, "Not yet needed"
-	return exp(hc(other.f) + self.f + dot(hc(other.a), self.a))
+	return exp(hc(self.f) + other.f + dot(hc(self.a), other.a))
 	
 def mulDL(self, other):		# FIXME
-	# <D other|self>
 	if wid(self) > 2 or self is not other:
 		raise NotImplementedError, "Not yet needed"
-	Q = empty((2*len(self),))
-	rho = other*self
+	Q = empty((2*len(other),))
+	rho = self*other
 	Q[0::2] = sum(rho, 1)
-	Q[1::2] = dot(rho, self.a)
+	Q[1::2] = dot(rho, other.a)
 	return Q
 	
 def mulDD(self, other):
@@ -55,33 +41,40 @@ def mulDD(self, other):
 	return poly*rho
 
 def mulNN(self, other):
-	x = hc(other.cs).flatten()
-	y = self.cs.flatten()
+	x = hc(self.cs).flatten()
+	y = other.cs.flatten()
 	if y.size > x.size:
 		x, y = y, x
 	x[:y.size] *= y
-	return diag(x)[:len(self), :len(other)]
-
-	# the Python monkeys got the columns of Vandermonde matrices backwards
+	return diag(x)[:len(other), :len(self)]
 	
 def mulLN(self, other):
-	if wid(other) > 2:
+	if wid(self) > 2:
 		raise NotImplementedError, "Not yet needed"
-	n = len(self)
-	result = vander(hc(other.a).flatten(), n)[:,::-1]
-	result *= self.cs/sqrt(factorial(xrange(n)))
-	result *= hc(exp(other.f))
+	n = len(other)
+	result = vander(hc(self.a).flatten(), n)[:,::-1]
+	result *= other.cs/sqrt(factorial(xrange(n)))
+	result *= hc(exp(self.f))
 	return result
 			
 def mulDN(self, other):
-	if wid(other) > 2:
+	if wid(self.state) > 2:
 		raise NotImplementedError, "Not yet needed"
-	ns = array(xrange(1,len(self)), ndmin=2)
-	result = empty((2*len(other), len(self)), dtype=complex)
-	result[0::2,:] = other*self
+	ns = array(xrange(1,len(other)), ndmin=2)
+	result = empty((len(self), len(other)), dtype=complex)
+	result[0::2,:] = self.state*other
 	r = result[1::2,:]
 	r[:,0] = 0
-	r[:,:0:-1] = vander(hc(other.a).flatten(), len(self)-1)
-	r[:,1::] *= self.cs[:,1::]*sqrt(ns/factorial(ns-1))
-	r *= hc(exp(other.f))
+	r[:,:0:-1] = vander(hc(self.a).flatten(), len(other)-1)
+	r[:,1::] *= other.cs[:,1::]*sqrt(ns/factorial(ns-1))
+	r *= hc(exp(self.state.f))
 	return result
+	
+def combinations(N, L, D):
+	"yield a sufficient set of (ltype, rtype), op tuples"
+	yield (L, L), mulLL
+	yield (D, D), mulDD
+	yield (D, L), mulDL
+	yield (N, N), mulNN
+	yield (L, N), mulLN
+	yield (D, N), mulDN

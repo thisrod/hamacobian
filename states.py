@@ -1,8 +1,37 @@
-import brackets
+from brackets import combinations
 from numpy import array, empty, log, sqrt, sum
 import numbers
 from copy import copy, deepcopy
+
+
+##################################################
+#
+#	Product dispatch system
+#
+##################################################
+
+def mul(self, other):
+	if isinstance(other, numbers.Complex):
+		return self.scaled(other)
+	elif (type(self), type(other)) in products:
+		return products[type(self), type(other)](self, other)
+	else:
+		return NotImplemented
+		
+def rmul(self, other):
+	if isinstance(other, numbers.Complex):
+		return self.scaled(other)
+	elif (type(self), type(other)) in products:
+		return products[type(self), type(other)](self, other).conj().T
+	else:
+		return NotImplemented
 	
+	
+##################################################
+#
+#	Row and sum classes
+#
+##################################################
 
 class KetRow(object):
 	
@@ -16,6 +45,9 @@ class KetRow(object):
 		
 	def sum(self):
 		return KetSum(self)
+		
+	__mul__, __rmul__= mul, rmul
+	
 
 def wid(s):
 	return s.__wid__()
@@ -26,14 +58,27 @@ class KetSum(object):
 	def __init__(self, row):
 		self.components = row
 		
-	def __mul__(self, other):
+	def expand(self, basis):
+		"basis must be a row of orthonormal kets, but this could be relaxed"
+		return type(basis)(basis*self)
+		
+	def _sum_mul(self, other):
+		return sum(self.components * other.components)
+		
+	def _row_mul(self, other):
 		return sum(self.components*other, axis=1)
 		
-	mulL = brackets.lum
-	mulD = brackets.lum
-	mulN = brackets.lum
+	def scaled(self, z):
+		return KetSum(self.components.scaled(z))
 	
-
+	__mul__, __rmul__= mul, rmul
+	
+	
+##################################################
+#
+#	Specific types of sum
+#
+##################################################
 
 class LccState(KetRow):
 	"A linear combination of coherent states."
@@ -91,12 +136,6 @@ class LccState(KetRow):
 		result.z += dz
 		return result
 		
-	def __mul__(self, other):
-		return other.mulL(self)
-		
-	mulD = brackets.mulDL
-	mulL = brackets.mulLL
-	mulN = brackets.lum
 
 class DLccState(KetRow):
 	"the total derivative of an LccState wrt z.  forms products with states and number state vectors as 2D arrays."
@@ -110,13 +149,6 @@ class DLccState(KetRow):
 	def __wid__(self):
 		# No adjustable parameters
 		return 0
-		
-	def __mul__(self, other):
-		return other.mulD(self.state)
-		
-	mulD = brackets.mulDD
-	mulL = brackets.lum
-	mulN = brackets.lum
 
 
 class NState(KetRow):
@@ -132,11 +164,19 @@ class NState(KetRow):
 	def __wid__(self):
 		return 1
 		
-	def __mul__(self, other):
-		return other.mulN(self)
 		
-	mulD = brackets.mulDN
-	mulL = brackets.mulLN
-	mulN = brackets.mulNN
-		
+##################################################
+#
+#	Dispatch table
+#
+##################################################
 
+products = {}
+
+products[KetSum, KetSum] = KetSum._sum_mul
+	
+for T in KetRow.__subclasses__():
+	products[KetSum, T] = KetSum._row_mul
+	
+for Ts, op in combinations(NState, LccState, DLccState):
+	products[Ts] = op
