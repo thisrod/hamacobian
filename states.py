@@ -1,5 +1,5 @@
 from brackets import combinations
-from numpy import array, empty, zeros_like, eye, diagflat, transpose, concatenate, squeeze, log, sqrt, conjugate, sum, cumsum, dot
+from numpy import ndarray, array, empty, zeros_like, eye, diagflat, transpose, concatenate, squeeze, log, sqrt, conjugate, sum, cumsum, dot
 import numbers
 from copy import copy, deepcopy
 
@@ -39,6 +39,9 @@ class QO(object):
 	def __rmul__(self, other):
 		assert isinstance(other, numbers.Complex)
 		return self*other 
+			
+	def __sub__(self, z):
+		return self + (-z)
 			
 	def __div__(self, z):
 		if isinstance(z, numbers.Complex):
@@ -99,6 +102,9 @@ class States(QO):
 		
 	def __deepcopy__(self, d):
 		return copy(self)._setvals(self.vals.copy())
+		
+	def shift(self, z):
+		self.vals += z.reshape(self.vals.shape)
 		
 	def bras(self):
 		return BraCol(self)
@@ -188,6 +194,10 @@ class BraSum(QO):
 		self.terms.scale(z.conjugate())
 		return self
 		
+	def shift(self, z):
+		self.terms.shift(z)
+		return self
+		
 	def H(self):
 		return KetSum(self.terms)
 	
@@ -204,6 +214,10 @@ class KetSum(QO):
 		
 	def scale(self, z):
 		self.terms.scale(z)
+		return self
+		
+	def shift(self, z):
+		self.terms.shift(z)
 		return self
 		
 	def H(self):
@@ -273,6 +287,9 @@ class DCoherentStates(States):
 #	Dispatch table
 #
 ##################################################
+
+QO.sums[QO, ndarray] = \
+	lambda Q, z: deepcopy(Q).shift(z)
 
 QO.products[QO, numbers.Complex] = \
 	lambda Q, z: deepcopy(Q).scale(z)
