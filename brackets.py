@@ -15,7 +15,7 @@ def NCmul(Nbras, Ckets):
 	if wid(Ckets) > 2:
 		raise NotImplementedError, "Fock states are single mode only"
 	n = len(Nbras)
-	return vander(Ckets.a.flatten(), n)[:,::-1]  / \
+	return vander(Ckets.a.flatten(), n)[:,::-1].T  / \
 		sqrt(factorial(xrange(n)))[:,newaxis] * \
 		Nbras.c * exp(Ckets.f)
 		

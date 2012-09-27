@@ -1,5 +1,5 @@
 from brackets import combinations
-from numpy import array, empty, zeros_like, eye, diagflat, transpose, concatenate, squeeze, log, sqrt, conjugate, sum, dot
+from numpy import array, empty, zeros_like, eye, diagflat, transpose, concatenate, squeeze, log, sqrt, conjugate, sum, cumsum, dot
 import numbers
 from copy import copy, deepcopy
 
@@ -17,11 +17,19 @@ class QO(object):
 	sums = {}
 	products = {}
 	
-	def _products_for(self, other):
-		return [QO.products[x,y] for x,y in QO.products.iterkeys() if isinstance(self, x) and isinstance(other, y)]
+	def _for(self, other, ops):
+		return [ops[x,y] for x,y in ops.iterkeys() if isinstance(self, x) and isinstance(other, y)]
+
+	def __add__(self, other):
+		ops = self._for(other, QO.sums)
+		assert len(ops) < 2
+		if ops:
+			return ops[0](self, other)
+		else:
+			return NotImplemented
 
 	def __mul__(self, other):
-		ops = self._products_for(other)
+		ops = self._for(other, QO.products)
 		assert len(ops) < 2
 		if ops:
 			return ops[0](self, other)
@@ -70,7 +78,7 @@ class States(QO):
 		# there is an arg for each var of each state.  the actual parameters are stored flat as the rows of the 2D array vals, and instances have attributes that are views into it
 		args = (array(x, ndmin=1) for x in args)
 		rows = zip(*[args]*len(self.params))
-		self._divs = [0] + [x.size for x in rows[0]]
+		self._divs = cumsum([0] + [x.size for x in rows[0]])
 		self._setvals(array([concatenate(c) for c in rows], dtype = complex))
 					
 	# subclasses should implement slicing, but not indexing.  that's done in KetRow or BraCol, which know if their elements are bras or kets.
@@ -104,7 +112,7 @@ class States(QO):
 	# state multiplication exploits <a|b> = <b|a>*
 	def __rmul__(self, other):
 		if isinstance(other, States):
-			ops = self._products_for(other)
+			ops = self._for(other, QO.products)
 			assert len(ops) < 2
 			if ops:
 				return ops[0](self, other).conj().T
@@ -137,6 +145,9 @@ class BraCol(QO):
 		# Dirac notation obscures this conjugate except when z is an eigenvalue. 
 		self.elements.scale(z.conjugate())
 		return self
+
+	def H(self):
+		return KetRow(self.elements)
 	
 
 class KetRow(QO):
@@ -145,7 +156,7 @@ class KetRow(QO):
 		self.elements = states
 		
 	def sum(self):
-		return BraSum(self.elements)
+		return KetSum(self.elements)
 		
 	def __len__(self):
 		return len(self.elements)
@@ -156,6 +167,9 @@ class KetRow(QO):
 	def scale(self, z):
 		self.elements.scale(z)
 		return self
+
+	def H(self):
+		return BraCol(self.elements)
 		
 class BraSum(QO):
 	
@@ -173,6 +187,9 @@ class BraSum(QO):
 	def scale(self, z):
 		self.terms.scale(z.conjugate())
 		return self
+		
+	def H(self):
+		return KetSum(self.terms)
 	
 class KetSum(QO):
 
@@ -188,6 +205,9 @@ class KetSum(QO):
 	def scale(self, z):
 		self.terms.scale(z)
 		return self
+		
+	def H(self):
+		return BraSum(self.terms)
 	
 	
 ##################################################
@@ -214,7 +234,11 @@ class CoherentStates(States):
 
 	def __getitem__(self, ns):
 		assert isinstance(ns, slice)
-		return copy(self)._setvals(self.vals[slice, :])
+		# try slice(1000, 1001).indices(10)
+		m, n = ns.start, ns.stop
+		if min(m,n) < 0 or max(m,n) > len(self):
+			raise IndexError
+		return copy(self)._setvals(self.vals[ns, :])
 		
 	def scale(self, z):
 		self.f += log(z)
