@@ -2,51 +2,65 @@
 
 from unittest import TestCase, main as run_tests
 from states import *
-from numpy import array, identity, exp, log, sum, sqrt, allclose, zeros
-from scipy.misc import factorial
+from numpy import array, identity, exp, log, sum, dot, sqrt, allclose, newaxis, zeros
+from numpy.random import randn
 from numpy.linalg import norm
+from scipy.misc import factorial
 
-def expands_to(basis, state, expansion):
-	return allclose((basis*state).flatten(), expansion)
+def randc(n):
+	return dot(randn(n,2), [1,1j])
+	
+	
 
-class CoherentTestCase(TestCase):
+class NumberCase(TestCase):
 	def setUp(self):
-		self.alpha = 3+4j
-		self.glauber = CoherentRow(0, self.alpha).sum().normalised()
-		self.basis = FockRow(*[1]*15)
-		self.fock = FockRow(*(self.basis*self.glauber).flatten()).sum()
-		n = array(xrange(len(self.basis)))
-		self.expansion = exp(-0.5*abs(self.alpha)**2)*self.alpha**n/sqrt(factorial(n))
-		
-class ExpansionTest(CoherentTestCase):
-	"Verify the expansion of glauber() over Fock states"
+		self.basis = FockStates(*[1]*5).bras()
+		self.two = FockStates(0, 0, 1).sum()
+		self.z = randc(1)[0]
+
+class SingleModeCase(TestCase):
+	def setUp(self):
+		self.basis = FockStates(*[1]*20).bras()
+		self.z = randc(1)[0]
+		self.samples = CoherentStates(0,0, 0,1.8, *randc(6))
+		for ket in self.samples.kets():
+			ket /= sqrt(ket*ket)
+			
+			
+			
+class ScalarsAssociate(NumberCase):
 	def runTest(self):
-		assert expands_to(self.basis, self.glauber, self.expansion)
-		assert expands_to(self.basis, self.fock, self.expansion)
+		z, two, basis = self.z, self.two, self.basis
+		assert allclose((z*basis)*two, z*(basis*two))
+		assert allclose((basis*z)*two, basis*(z*two))
+		assert allclose((basis*two)*z, basis*(two*z))
 		
-class FirstDerivativeTest(CoherentTestCase):
-	"Check that the product of a coherent state with its derivative is the derivative of the product"
+class ScalarsCommute(NumberCase):
 	def runTest(self):
-		h = 1e-4
-		D = self.glauber.D()
-		n = len(D)
-		E = h*identity(n)
-		exact = self.basis*D
-		for i in xrange(n):
-			approx = ((self.basis*(self.glauber.components+E[i,:]))-(self.basis*(self.glauber.components+(-E[i,:]))))/2/h
-			assert allclose(approx.flatten(),exact[:,i])
+		z, two, basis = self.z, self.two, self.basis
+		assert allclose(z*basis*two, basis*z*two)
+		assert allclose(z*basis*two, basis*two*z)
 		
-class SecondDerivativeTest(CoherentTestCase):
-	"Check that the product of two coherent state derivatives is the derivative of the product of a coherent state with one derivative"
+class ExpansionTest(SingleModeCase):
 	def runTest(self):
-		h = 1e-4
-		D = self.glauber.D()
-		n = len(D)
-		E = h*identity(n)
-		exact = D*D
-		for i in xrange(n):
-			approx = ((D*(self.glauber+E[i,:]))-(D*(self.glauber+(-E[i,:]))))/2/h
-			assert allclose(approx.flatten(),exact[:,i])
+		for ket in self.samples.kets():
+			a = ket.a
+			cs = (self.basis * ket).flatten
+			for n in xrange(len(self.basis)):
+				assert allclose(cs[n], exp(-0.5*abs(a)**2) * a**n / sqrt(factorial(n)) )
+		
+class CoherentStateBracketTest(SingleModeCase):
+	"Verify the inner products of coherent states"
+	def runTest(self):
+		for bra in self.samples.bras():
+			for ket in self.samples.kets():
+				assert allclose(bra*ket, exp(-0.5*abs(bra.a)**2 -0.5*abs(ket.a)**2 + bra.a.conj()*ket.a))
+
+class CoherentStateScalingTest(SingleModeCase):
+	"Verify that norms of coherent states are linear in scalar multiplication"
+	def runTest(self):
+		for ket in self.samples.kets():
+			assert allclose(self.basis*(self.z*ket), self.z*(self.basis*ket))
 				
 if __name__ == "__main__":
             run_tests()

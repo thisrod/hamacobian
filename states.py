@@ -1,181 +1,247 @@
 from brackets import combinations
-from numpy import array, empty, log, sqrt, sum
+from numpy import array, empty, zeros_like, eye, diagflat, transpose, concatenate, squeeze, log, sqrt, conjugate, sum, dot
 import numbers
 from copy import copy, deepcopy
 
 
 ##################################################
 #
-#	multiplicative dispatch
+#	arithmetic dispatch
 #
 ##################################################
 
-def mul(self, other):
-	if isinstance(other, numbers.Complex):
-		return self.scaled(other)
-	elif (type(self), type(other)) in products:
-		return products[type(self), type(other)](self, other)
-	else:
-		return NotImplemented
-		
-def rmul(self, other):
-	if isinstance(other, numbers.Complex):
-		return self.scaled(other)
-	elif (type(self), type(other)) in products:
-		return products[type(self), type(other)](self, other).conj().T
-	else:
-		return NotImplemented
-		
-def div(self, z):
-	if isinstance(z, numbers.Complex):
-		return self.scaled((1+0j)/z)
-	else:
-		return NotImplemented
+class QO(object):
+	"I dispatch arithmetic operations.  subclasses should implement scaled, for scalar multiplication."
 	
+	 # these dispatch tables are set up at the end of this file, when the classes they refer to are defined.
+	sums = {}
+	products = {}
 	
+	def _products_for(self, other):
+		return [QO.products[x,y] for x,y in QO.products.iterkeys() if isinstance(self, x) and isinstance(other, y)]
+
+	def __mul__(self, other):
+		ops = self._products_for(other)
+		assert len(ops) < 2
+		if ops:
+			return ops[0](self, other)
+		else:
+			return NotImplemented
+			
+	def __rmul__(self, other):
+		assert isinstance(other, numbers.Complex)
+		return self*other 
+			
+	def __div__(self, z):
+		if isinstance(z, numbers.Complex):
+			return deepcopy(self).scale(1./z)
+		else:
+			return NotImplemented
+			
+	# These work through references if possible	
+	def __imul__(self, z):
+		assert isinstance(z, numbers.Complex)
+		return self.scale(z)
+			
+	def __idiv__(self, z):
+		assert isinstance(z, numbers.Complex)
+		return self.scale(1./z)
+		
 	
 ##################################################
 #
-#	Row and sum classes
+#	states base class
 #
 ##################################################
 
-class KetRow(object):
+def wid(s):
+	"The width of a collection of states is the number of parameters defining each state."
+	return s.__wid__()
+
+class States(QO):
+	"a sequence of quantum states.  multiplication gives an array of inner products"
 	
-	def similar(self, other):
-		return type(self) is type(other) and \
-			len(self) == len(other) and \
-			wid(self) == wid(other)
+	# subclasses set params to a list of parameters for each state
+	# by convention, an orthonormal expansion calls its coefficients "c"
+	params = []
+	vals = None
+	
+	def __init__(self, *args):
+		# there is an arg for each var of each state.  the actual parameters are stored flat as the rows of the 2D array vals, and instances have attributes that are views into it
+		args = (array(x, ndmin=1) for x in args)
+		rows = zip(*[args]*len(self.params))
+		self._divs = [0] + [x.size for x in rows[0]]
+		self._setvals(array([concatenate(c) for c in rows], dtype = complex))
+					
+	# subclasses should implement slicing, but not indexing.  that's done in KetRow or BraCol, which know if their elements are bras or kets.
+	
+	def __len__(self):
+		return self.vals.shape[0]
+		
+	def __wid__(self):
+		return self.vals.shape[1]
+	
+	def _setvals(self, vals):
+		"replace vals with a similar set, and make parameter attributes consistent"
+		assert self.vals is None or vals.shape[1] == wid(self)
+		self.vals = vals
+		for i in xrange(len(self._divs)-1):
+			setattr(self, self.params[i], self.vals[:,self._divs[i]:self._divs[i+1]])
+		return self
+		
+	def __deepcopy__(self, d):
+		return copy(self)._setvals(self.vals.copy())
+		
+	def bras(self):
+		return BraCol(self)
+		
+	def kets(self):
+		return KetRow(self)
 		
 	def sum(self):
 		return KetSum(self)
-		
-	__mul__, __rmul__, __div__= mul, rmul, div
-	
-
-def wid(s):
-	return s.__wid__()
-	
-class KetSum(object):
-
-	def __init__(self, row):
-		self.components = row
-		
-	def expand(self, basis):
-		"basis must be a row of orthonormal kets, but this could be relaxed"
-		return type(basis)(basis*self)
 			
-	def norm(self):
-		return sqrt(sum(self*self).real)
-
-	def normalised(self):
-		return self/self.norm()
-		
-	def D(self):
-		return self.components.D()
-		
-	def __add__(self, dz):
-		return KetSum(self.components+dz)
-		
-	def _sum_mul(self, other):
-		return sum(self.components * other.components)
-		
-	def _row_mul(self, other):
-		return sum(self.components*other, axis=0)
-		
-	def scaled(self, z):
-		return KetSum(self.components.scaled(z))
-	
-	__mul__, __rmul__, __div__= mul, rmul, div
-	
-	
-##################################################
-#
-#	Specific types of row
-#
-##################################################
-
-class CoherentRow(KetRow):
-	# f is row of log weights, and a is a matrix whose cobrackets.lumns are vector ampltiudes.  these shapes fit a row of kets.
-	# Use copy construction if efficiency matters
-
-	def __init__(self, *args):
-		"CoherentRow(f1, a1, ..., fn, an) where f is a logarithmic weight, and a the corresponding coherent amplitude(s)."
-		if isinstance(args[1], numbers.Complex):
-			ain = [[x] for x in args[1::2]]
+	# state multiplication exploits <a|b> = <b|a>*
+	def __rmul__(self, other):
+		if isinstance(other, States):
+			ops = self._products_for(other)
+			assert len(ops) < 2
+			if ops:
+				return ops[0](self, other).conj().T
 		else:
-			ain = args[1::2]
-		n = len(args)/2
-		m = len(ain[0])+1
-		self.setz(empty((m,n), dtype=complex))
-		self.setf(args[0::2])
-		self.seta(ain)
+			return QO.__rmul__(self, other)
+	
+	
+	
+##################################################
+#
+#	row, column and sum classes
+#
+##################################################
+
+class BraCol(QO):
+	
+	def __init__(self, states):
+		self.elements = states
+		
+	def sum(self):
+		return BraSum(self.elements)
 		
 	def __len__(self):
-		return self.z.shape[1]
+		return len(self.elements)
 		
-	def __wid__(self):
-		return self.z.shape[0]
+	def __getitem__(self, i):
+		return BraSum(self.elements[i:i+1])
 		
-	def setz(self, z):
-		self.z = z
-		self.f = self.z[0:1,:]
-		self.a = self.z[1:,:]
+	def scale(self, z):
+		# Dirac notation obscures this conjugate except when z is an eigenvalue. 
+		self.elements.scale(z.conjugate())
+		return self
+	
+
+class KetRow(QO):
+	
+	def __init__(self, states):
+		self.elements = states
 		
-	def setf(self, f):
-		self.f[:,:] = f
+	def sum(self):
+		return BraSum(self.elements)
 		
-	def seta(self, a):
-		# This takes amplitude vectors as rows, as does __init__
-		self.a[:,:] = array(a).T
+	def __len__(self):
+		return len(self.elements)
 		
-	def __deepcopy__(self, d):
-		result = copy(self)
-		result.setz(self.z.copy())
-		return result
+	def __getitem__(self, i):
+		return KetSum(self.elements[i:i+1])
 		
-	def scaled(self, z):
-		result = deepcopy(self)
-		result.f += log(z)
-		return result
+	def scale(self, z):
+		self.elements.scale(z)
+		return self
+		
+class BraSum(QO):
+	
+	# if a sum has one term, the params of components become attributes of the sum, with axis 1 elided.
+	
+	def __init__(self, states):
+		self.terms = states
+		if len(states) == 1:
+			for p in states.params:
+				setattr(self, p, getattr(states, p).flatten())
+				
+	def D(self):
+		return BraCol(self.terms.D())
+		
+	def scale(self, z):
+		self.terms.scale(z.conjugate())
+		return self
+	
+class KetSum(QO):
+
+	def __init__(self, states):
+		self.terms = states
+		if len(states) == 1:
+			for p in states.params:
+				setattr(self, p, getattr(states, p).flatten())
+				
+	def D(self):
+		return KetRow(self.terms.D())
+		
+	def scale(self, z):
+		self.terms.scale(z)
+		return self
+	
+	
+##################################################
+#
+#	specific types of quantum state
+#
+##################################################
+
+class FockStates(States):
+	"c[n] is the coefficient of |n>"
+	
+	params = ["c"]
+	
+	def scale(self, z):
+		self.c *= z
+		return self
+	
+	def __getitem__(self, ns):
+		raise NotImplementedError		
+
+class CoherentStates(States):
+	# f is a log weight, and a a vector ampltiude.  ideally, log weights would be stored with a floating point real part, and a fixed point imaginary part
+	params = ["f", "a"]
+
+	def __getitem__(self, ns):
+		assert isinstance(ns, slice)
+		return copy(self)._setvals(self.vals[slice, :])
+		
+	def scale(self, z):
+		self.f += log(z)
+		return self
 		
 	def D(self):
-		result = DCoherentRow()
-		result.be(self)
-		return result
-		
-	def __add__(self, dz):
-		result = deepcopy(self)
-		result.z += CoherentRow(*dz).z
-		return result
-		
+		return DCoherentStates(self)
+				
 
-class DCoherentRow(KetRow):
-	"the total derivative of a CoherentRow.sum()"
-
-	def be(self, row):
-		self.components = row
+class DCoherentStates(States):
+	"the sequence of partial derivative of CoherentStates"
+	
+	params = CoherentStates.params
+	
+	def __init__(self, cstates):
+		self._divs = cstates._divs
+		# scaling a derivative doesn't scale the point at which it was taken
+		self._setvals(cstates.vals.copy())
+		
+	scale = CoherentStates.scale
 		
 	def __len__(self):
-		return len(self.components)*wid(self.components)
+		return self.vals.size
 		
 	def __wid__(self):
 		# No adjustable parameters
 		return 0
-
-
-class FockRow(KetRow):
-	"a state expanded over Fock states."
-	
-	def __init__(self, *cs):
-		"cs are the coefficients, starting with |0>"
-		self.cs = array(cs, dtype=complex, ndmin=2)
-		
-	def __len__(self):
-		return self.cs.shape[1]
-		
-	def __wid__(self):
-		return 1
 		
 		
 ##################################################
@@ -184,12 +250,48 @@ class FockRow(KetRow):
 #
 ##################################################
 
-products = {}
+QO.products[QO, numbers.Complex] = \
+	lambda Q, z: deepcopy(Q).scale(z)
 
-products[KetSum, KetSum] = KetSum._sum_mul
+QO.products[BraCol, KetRow] = \
+	lambda bras, kets: bras.elements * kets.elements
 	
-for T in KetRow.__subclasses__():
-	products[KetSum, T] = KetSum._row_mul
+QO.products[BraSum, KetRow] = \
+	lambda bra, kets: sum(bra.terms * kets.elements, axis=0)
 	
-for Ts, op in combinations(FockRow, CoherentRow, DCoherentRow):
-	products[Ts] = op
+QO.products[BraCol, KetSum] = \
+	lambda bras, ket: sum(bras.elements * ket.terms, axis=1)
+	
+QO.products[BraSum, KetSum] = \
+	lambda bra, ket: sum(bra.terms * ket.terms)
+	
+	
+# The values of a given parameter attribute for all the states forms a column.  So we usually need to transpose those from the ket, and conjugate those from the bra
+
+def bracket(f):
+	return lambda bras, kets: \
+		f(Params(conjugate, bras), Params(transpose, kets))
+		
+class Params:
+	# dear reader: I can't do this with new style classes.  can you?
+	def __init__(self, F, bks):
+		assert isinstance(bks, States)
+		self._prototype = bks
+		self.F = F
+			
+	def __getattr__(self, name):
+		v = getattr(self._prototype, name)
+		return self.F(v) if name == "vals" or name in self._prototype.params else v
+		
+@bracket
+def mul_orth(bras, kets):
+	"product of expansions over the same orthogonal basis"
+	a = diagflat(bras.c)
+	b = eye(len(bras), len(kets))
+	c = diagflat(kets.c)
+	return dot(dot(a,b),c)
+	
+QO.products[FockStates,FockStates] = mul_orth
+	
+for Ts, op in combinations(FockStates, CoherentStates, DCoherentStates):
+	QO.products[Ts] = bracket(op)
