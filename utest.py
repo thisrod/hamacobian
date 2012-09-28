@@ -48,6 +48,10 @@ class ExpansionTest(SingleModeCase):
 			cs = (self.basis * ket).flatten()
 			for n in xrange(len(self.basis)):
 				assert allclose(cs[n], exp(-0.5*abs(a)**2) * a**n / sqrt(factorial(n)) )
+				
+class NumberTest(NumberCase):
+	def runTest(self):
+		assert allclose(2, self.two.H()*self.two.lowered().raised())
 		
 class CoherentStateBracketTest(SingleModeCase):
 	"Verify the inner products of coherent states"

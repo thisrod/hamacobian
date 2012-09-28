@@ -1,5 +1,5 @@
-from brackets import combinations
-from numpy import ndarray, array, empty, zeros_like, eye, diagflat, transpose, concatenate, squeeze, log, sqrt, conjugate, sum, cumsum, dot
+from numpy import ndarray, array, newaxis, empty, zeros, arange, eye, diagflat, vander, transpose, concatenate, squeeze, log, sqrt, exp, conjugate, sum, cumsum, dot, maximum, vstack
+from scipy.misc import factorial
 import numbers
 from copy import copy, deepcopy
 
@@ -198,6 +198,12 @@ class BraSum(QO):
 		self.terms.shift(z)
 		return self
 		
+	def lowered(self):
+		return BraSum(self.terms.lowered())
+		
+	def raised(self):
+		return BraSum(self.terms.raised())
+		
 	def H(self):
 		return KetSum(self.terms)
 	
@@ -220,6 +226,12 @@ class KetSum(QO):
 		self.terms.shift(z)
 		return self
 		
+	def lowered(self):
+		return KetSum(self.terms.lowered())
+		
+	def raised(self):
+		return KetSum(self.terms.raised())
+		
 	def H(self):
 		return BraSum(self.terms)
 	
@@ -231,16 +243,34 @@ class KetSum(QO):
 ##################################################
 
 class FockStates(States):
-	"c[n] is the coefficient of |n>"
+	"c[n] is the coefficient of |n+self._n0>, where |-n>=0"
+	
+	_n0 = 0
 	
 	params = ["c"]
+	
+	def nng_ns(self):
+		return arange(max(0, self._n0), max(0, self._n0+len(self)))
+	
+	def all_ns(self):
+		return maximum(0, self._n0 + arange(len(self)))
 	
 	def scale(self, z):
 		self.c *= z
 		return self
 	
 	def __getitem__(self, ns):
-		raise NotImplementedError		
+		raise NotImplementedError
+		
+	def lowered(self):
+		result = FockStates(*self.c.flatten()*sqrt(self.all_ns()))
+		result._n0 = self._n0 - 1
+		return result
+		
+	def raised(self):
+		result = FockStates(*self.c.flatten()*sqrt(self.all_ns()+1))
+		result._n0 = self._n0 + 1
+		return result
 
 class CoherentStates(States):
 	# f is a log weight, and a a vector ampltiude.  ideally, log weights would be stored with a floating point real part, and a fixed point imaginary part
@@ -262,6 +292,7 @@ class CoherentStates(States):
 		return DCoherentStates(self)
 				
 
+# Make these raised coherent states
 class DCoherentStates(States):
 	"the sequence of partial derivative of CoherentStates"
 	
@@ -271,6 +302,7 @@ class DCoherentStates(States):
 		self._divs = cstates._divs
 		# scaling a derivative doesn't scale the point at which it was taken
 		self._setvals(cstates.vals.copy())
+		self._arg = cstates	# Kludge
 		
 	scale = CoherentStates.scale
 		
@@ -325,14 +357,46 @@ class Params:
 		return self.F(v) if name == "vals" or name in self._prototype.params else v
 		
 @bracket
-def mul_orth(bras, kets):
-	"product of expansions over the same orthogonal basis"
+def NNmul(bras, kets):
 	a = diagflat(bras.c)
-	b = eye(len(bras), len(kets))
+	b = eye(len(bras), len(kets), bras._n0 - kets._n0)
 	c = diagflat(kets.c)
 	return dot(dot(a,b),c)
+
+# Hungarian prefixes:
+# N = FockStates, C = CoherentStates, D = DCoherentStates, A = all
+
+def wid(x):
+	return x.__wid__()
 	
-QO.products[FockStates,FockStates] = mul_orth
+@bracket
+def NCmul(Nbras, Ckets):
+	# the slice [::-1] means reverse order; Numpy puts the columns of Vandermonde matrices backwards.
+	if wid(Ckets) > 2:
+		raise NotImplementedError, "Fock states are single mode only"
+	top = zeros((min(len(Nbras), max(0, -Nbras._n0)), len(Ckets)))
+	print Ckets.a.shape, (Nbras.nng_ns()[:,newaxis]).shape, \
+		sqrt(factorial(Nbras.nng_ns()[:,newaxis])).shape, \
+		Nbras.c.shape, exp(Ckets.f).shape
+	bot = Ckets.a**(Nbras.nng_ns()[:,newaxis])  / \
+		sqrt(factorial(Nbras.nng_ns()[:,newaxis])) * \
+		Nbras.c[-Nbras._n0:,:] * exp(Ckets.f)
+	return vstack((top, bot))
+		
+@bracket
+def CCmul(bras, kets):
+	return exp(bras.f + kets.f + dot(bras.a, kets.a))
+			
+def DAmul(Dbras, kets):
+	if Dbras.a.shape[1] > 1:
+		raise NotImplementedError, "Fock states are single mode only"
+	result = empty((len(Dbras), len(kets)), dtype=complex)
+	Lbras = Dbras._arg
+	result[0::2,:] = Lbras * kets
+	result[1::2,:] = Lbras * kets.lowered()
+	return result
 	
-for Ts, op in combinations(FockStates, CoherentStates, DCoherentStates):
-	QO.products[Ts] = bracket(op)
+QO.products[FockStates,FockStates] = NNmul
+QO.products[FockStates,CoherentStates] = NCmul
+QO.products[CoherentStates,CoherentStates] = CCmul
+QO.products[DCoherentStates,States] = DAmul
