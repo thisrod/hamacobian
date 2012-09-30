@@ -1,4 +1,4 @@
-from numpy import ndarray, array, newaxis, empty, zeros, arange, eye, diagflat, vander, transpose, concatenate, squeeze, log, sqrt, exp, conjugate, sum, cumsum, dot, maximum, vstack
+from numpy import ndarray, array, newaxis, empty, zeros, ones, arange, eye, diagflat, vander, transpose, concatenate, squeeze, log, sqrt, exp, conjugate, sum, cumsum, dot, maximum, vstack, hstack
 from scipy.misc import factorial
 import numbers
 from copy import copy, deepcopy
@@ -272,6 +272,7 @@ class FockStates(States):
 		result._n0 = self._n0 + 1
 		return result
 
+
 class CoherentStates(States):
 	# f is a log weight, and a a vector ampltiude.  ideally, log weights would be stored with a floating point real part, and a fixed point imaginary part
 	params = ["f", "a"]
@@ -290,24 +291,58 @@ class CoherentStates(States):
 		
 	def D(self):
 		return DCoherentStates(self)
+		
+	def raised(self):
+		return PolyStates(self).raised()
+		
+	def lowered(self):
+		return PolyStates(self).lowered()
 				
 
-# Make these raised coherent states
-class DCoherentStates(States):
-	"the sequence of partial derivative of CoherentStates"
-	
-	params = CoherentStates.params
-	
+class PolyStates(States):
+
 	def __init__(self, cstates):
-		self._divs = cstates._divs
-		# scaling a derivative doesn't scale the point at which it was taken
-		self._setvals(cstates.vals.copy())
-		self._arg = cstates	# Kludge
+		self._arg = cstates
+		# a polynomial in the raising operator for each state
+		self._rpoly = ones((len(cstates), 1))
 		
-	scale = CoherentStates.scale
+	def scale(self, z):
+		self._rpoly *= z
 		
 	def __len__(self):
-		return self.vals.size
+		return len(self._arg)
+		
+	def __wid__(self):
+		return 0
+		
+	def raised(self):
+		result = PolyStates(self._arg)
+		result._rpoly = hstack((self._rpoly, zeros((len(self), 1))))
+		return result
+
+	def lowered(self):
+		# a a*^n = a*^n a + n a*^(n-1)
+		nml = self._rpoly*self._arg.a
+		nml[:,:-1] += arange(1, nml.shape[1])[newaxis,:]*self._rpoly[:,1:nml.shape[1]]
+		result = PolyStates(self._arg)
+		result._rpoly = nml
+		return result
+					
+
+class DCoherentStates(States):
+	"the sequence of partial derivatives of CoherentStates"
+	
+	def __init__(self, cstates):
+		self.first = cstates
+		self.rest = cstates.raised()
+		
+	def scale(self, z):
+		self.first.scale(z)
+		self.rest.scale(z)
+		return self
+		
+	def __len__(self):
+		return len(self.first) + len(self.rest)
 		
 	def __wid__(self):
 		# No adjustable parameters
@@ -364,20 +399,16 @@ def NNmul(bras, kets):
 	return dot(dot(a,b),c)
 
 # Hungarian prefixes:
-# N = FockStates, C = CoherentStates, D = DCoherentStates, A = all
+# N = FockStates, C = CoherentStates, D = DCoherentStates, R = PolyStates, A = all
 
 def wid(x):
 	return x.__wid__()
 	
 @bracket
 def NCmul(Nbras, Ckets):
-	# the slice [::-1] means reverse order; Numpy puts the columns of Vandermonde matrices backwards.
 	if wid(Ckets) > 2:
 		raise NotImplementedError, "Fock states are single mode only"
 	top = zeros((min(len(Nbras), max(0, -Nbras._n0)), len(Ckets)))
-	print Ckets.a.shape, (Nbras.nng_ns()[:,newaxis]).shape, \
-		sqrt(factorial(Nbras.nng_ns()[:,newaxis])).shape, \
-		Nbras.c.shape, exp(Ckets.f).shape
 	bot = Ckets.a**(Nbras.nng_ns()[:,newaxis])  / \
 		sqrt(factorial(Nbras.nng_ns()[:,newaxis])) * \
 		Nbras.c[-Nbras._n0:,:] * exp(Ckets.f)
@@ -386,17 +417,23 @@ def NCmul(Nbras, Ckets):
 @bracket
 def CCmul(bras, kets):
 	return exp(bras.f + kets.f + dot(bras.a, kets.a))
+	
+def ARmul(Abras, Rkets):
+	result = zeros((len(Abras), len(Rkets)), dtype=complex)
+	for n in xrange(Rkets._rpoly.shape[1]):
+		b = Abras
+		for i in xrange(n): b = b.lowered()
+		result += Rkets._rpoly[:,n] * (b*Rkets._arg)
+	return result
 			
 def DAmul(Dbras, kets):
-	if Dbras.a.shape[1] > 1:
-		raise NotImplementedError, "Fock states are single mode only"
 	result = empty((len(Dbras), len(kets)), dtype=complex)
-	Lbras = Dbras._arg
-	result[0::2,:] = Lbras * kets
-	result[1::2,:] = Lbras * kets.lowered()
+	result[0::2,:] = Dbras.first * kets
+	result[1::2,:] = Dbras.rest * kets
 	return result
 	
 QO.products[FockStates,FockStates] = NNmul
 QO.products[FockStates,CoherentStates] = NCmul
 QO.products[CoherentStates,CoherentStates] = CCmul
+QO.products[States,PolyStates] = ARmul
 QO.products[DCoherentStates,States] = DAmul
