@@ -22,12 +22,6 @@ class QO(object):
 			return deepcopy(self).scale(z)
 		else:
 			return NotImplemented
-			
-	def __div__(self, z):
-		if isinstance(z, numbers.Complex):
-			return deepcopy(self).scale((1+0j)/z)
-		else:
-			return NotImplemented
 		
 		
 def operator(optable):
@@ -45,7 +39,7 @@ QO.__add__ = operator(QO.sums)
 QO.__mul__ = operator(QO.products)
 
 QO.products[QO, numbers.Complex] = \
-	lambda Q, z: deepcopy(Q).scale(z)
+	lambda Q, z: deepcopy(Q).scale(z.conjugate())
 
 		
 
@@ -83,12 +77,18 @@ class FockExpansion(State):
 		return self
 				
 	def lowered(self):
-		return self.prms[1:]*sqrt(xrange(1,wid(self)))
+		return FockExpansion(self.prms[1:]*sqrt(xrange(1,wid(self))))
 		
 	def raised(self):
-		rprms = sqrt(xrange(wid(self)+1))
+		rprms = sqrt(arange(wid(self)+1, dtype=complex))
 		rprms[1:] *= self.prms
 		return FockExpansion(rprms)
+
+def NNadd(self, other):
+	# silently discarding imaginary parts: yet another interesting designe choice from Numpy
+	prms = zeros(max(wid(self), wid(other)), dtype=complex)
+	for x in self, other: prms[:wid(x)] += x.prms
+	return FockExpansion(prms)
 		
 def NNmul(bra, ket):
 	a = bra.prms.conj()
@@ -96,6 +96,7 @@ def NNmul(bra, ket):
 	c = ket.prms
 	return dot(dot(a,b),c)
 	
+QO.sums[FockExpansion,FockExpansion] = NNadd
 QO.products[FockExpansion,FockExpansion] = NNmul
 
 	
@@ -126,7 +127,7 @@ def explower(state, a):
 	"exp(a*lower) state"
 	n, Q, rslt = 2, a * state.lowered(), state
 	while abs(Q*Q) > 0:
-		n, Q, rslt = n+1, a*Q.lowered()/factorial(n), rslt+Q
+		n, Q, rslt = n+1, (a/n)*Q.lowered(), rslt+Q
 	return rslt
 	
 def DAmul(Dbra, ket):
