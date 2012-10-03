@@ -47,11 +47,20 @@ QO.products[QO, numbers.Complex] = \
 #
 #	quantum states
 #
+#	N.B. states reject scalar multiplication, because it's too easy to say
+#	z * bra * ket when you mean bra * (z * ket).
+#	Multiply complex numbers, or use .scale() if you must.
+#
 ##################################################
 
 class State(QO):
 
+	def __mul__(self, other):
+		assert not isinstance(other, numbers.Complex)
+		return QO.__mul__(self, other)
+
 	def __rmul__(self, other):
+		assert not isinstance(other, numbers.Complex)
 		if isinstance(other, State):
 			# danger of infinite recursion
 			return operator(QO.products)(self, other).conj().T
@@ -85,7 +94,7 @@ class FockExpansion(State):
 		return FockExpansion(rprms)
 
 def NNadd(self, other):
-	# silently discarding imaginary parts: yet another interesting designe choice from Numpy
+	# silently discarding imaginary parts: yet another interesting design choice from Numpy
 	prms = zeros(max(wid(self), wid(other)), dtype=complex)
 	for x in self, other: prms[:wid(x)] += x.prms
 	return FockExpansion(prms)
@@ -125,22 +134,22 @@ class DisplacedState(State):
 		
 def explower(state, a):
 	"exp(a*lower) state"
-	n, Q, rslt = 2, a * state.lowered(), state
+	n, Q, rslt = 2, state.lowered().scale(a), state
 	while abs(Q*Q) > 0:
-		n, Q, rslt = n+1, (a/n)*Q.lowered(), rslt+Q
+		n, Q, rslt = n+1, Q.lowered().scale(a/n), rslt+Q
 	return rslt
 	
 def DAmul(Dbra, ket):
 	return exp(Dbra.f.conjugate() - 0.5*abs(Dbra.a)**2) * \
-		explower(Dbra.base, -Dbra.a.conjugate()) * \
-		explower(ket, Dbra.a.conjugate())
+		(explower(Dbra.base, -Dbra.a.conjugate()) * \
+		explower(ket, Dbra.a.conjugate()))
 	
 def DDmul(Dbra, Dket):
 	a, b = Dbra.a, Dket.a
 	return exp(Dbra.f.conjugate() + Dket.f - \
 		0.5*abs(a)**2 - 0.5*abs(b)**2 + a.conjugate()*b) * \
-		explower(Dbra.base, (b-a).conjugate()) * \
-		explower(Dket.base, (a-b).conjugate())
+		(explower(Dbra.base, (b-a).conjugate()) * \
+		explower(Dket.base, (a-b).conjugate()))
 		
 QO.products[DisplacedState,FockExpansion] = DAmul
 QO.products[DisplacedState,DisplacedState] = DDmul

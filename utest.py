@@ -2,7 +2,7 @@
 
 from unittest import TestCase, main as run_tests
 from states import *
-from numpy import array, identity, exp, log, sum, dot, sqrt, allclose, newaxis, zeros
+from numpy import array, identity, exp, log, sum, dot, sqrt, allclose, newaxis, zeros, outer
 from numpy.random import randn
 from numpy.linalg import norm
 from scipy.misc import factorial
@@ -27,7 +27,7 @@ class SingleModeCase(TestCase):
 		self.basis = array([FockExpansion(e) for e in eye(20)])
 		self.z = randc(1)[0]
 		self.samples = array([DisplacedState(vac, z, w)
-			for z, w in [(0,0), (0,1.8)] + zip(randn(3), randc(3))])
+			for z, w in [(0,0), (0,1.8), (0,-3)] + zip(randn(3), randc(3))])
 		for ket in self.samples:
 			ket.scale(1/sqrt(ket*ket))
 					
@@ -46,9 +46,10 @@ class NumberTest(NumberCase):
 class CoherentStateBracketTest(SingleModeCase):
 	"Verify the inner products of coherent states"
 	def runTest(self):
-		for bra in self.samples:
-			for ket in self.samples:
-				assert closenough(bra*ket, exp(-0.5*abs(bra.a)**2 -0.5*abs(ket.a)**2 + bra.a.conjugate()*ket.a))
+		a = array([q.a for q in self.samples], ndmin=2)
+		self.expected = exp(-0.5*abs(a.T)**2 - 0.5*abs(a)**2 + a.conjugate().T*a)
+		self.computed = array(outer(self.samples, self.samples), dtype=complex)
+		assert closenough(self.expected, self.computed)
 				
 #class ApproximateDerivativeTest(SingleModeCase):
 #	def runTest(self):
