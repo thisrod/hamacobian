@@ -26,11 +26,29 @@ class SingleModeCase(TestCase):
 	def setUp(self):
 		self.basis = array([FockExpansion(e) for e in eye(20)])
 		self.z = randc(1)[0]
-		self.samples = array([DisplacedState(vac, z, w)
-			for z, w in [(0,0), (0,1.8), (0,-3)] + zip(randn(3), randc(3))])
+		self.samples = array([DisplacedState(vac, w)
+			for w in [0, 1.8, -3] + list(randc(3))])
 		for ket in self.samples:
 			ket.scale(1/sqrt(ket*ket))
 					
+
+class DiracProductAssociates(SingleModeCase):
+	def runTest(self):
+		k = Ket(Sum(self.samples))
+		b = array([Bra(s) for s in self.basis])[:,newaxis]
+		z = self.z
+		assert closenough((z*b)*k, z*(b*k))
+		assert closenough((b*z)*k, b*(z*k))
+		assert closenough((b*k)*z, b*(k*z))
+	
+class ScalarProductCommutes(SingleModeCase):
+	def runTest(self):
+		k = Ket(Sum(self.samples))
+		b = array([Bra(s) for s in self.basis])[:,newaxis]
+		z = self.z
+		assert closenough(z*b*k, b*z*k)
+		assert closenough(z*b*k, b*k*z)
+
 class ExpansionTest(SingleModeCase):
 	def runTest(self):
 		for ket in self.samples:
@@ -50,15 +68,39 @@ class CoherentStateBracketTest(SingleModeCase):
 		self.expected = exp(-0.5*abs(a.T)**2 - 0.5*abs(a)**2 + a.conjugate().T*a)
 		self.computed = array(outer(self.samples, self.samples), dtype=complex)
 		assert closenough(self.expected, self.computed)
+
+class PrmsRoundTrip(SingleModeCase):
+	def runTest(self):
+		self.s = Sum(self.samples)
+		self.zs = self.s.prms()
+		self.t = self.s.smrp(self.zs)
+		assert abs((self.s-self.t)*(self.s-self.t)) < 1e-8
+
+class UpDown(SingleModeCase):
+	"raising a ket and lowering a bra give the same product"
+	def runTest(self):
+		r = array([s.raised() for s in self.samples])
+		l = array([s.lowered() for s in self.samples])
+		sm = Sum(self.samples)
+		assert closenough(l*self.samples, self.samples*r)
+		assert closenough(l*sm, self.samples*sm.raised())
+		assert closenough(sm.lowered()*self.samples, sm*r)
+		assert closenough(sm.lowered()*sm, sm*sm.raised())
+		
+		
 				
-#class ApproximateDerivativeTest(SingleModeCase):
-#	def runTest(self):
-#		basis = self.basis
-#		hs = self.z*1e-4*eye(2)
-#		for ket in self.samples.kets():
-#			for h in hs:
-#				assert allclose(basis*(ket+h) - basis*(ket-h), dot(basis*ket.D(), 2*h))
-#
+class ApproximateDerivativeTest(SingleModeCase):
+	def runTest(self):
+		basis = array([Bra(s) for s in self.basis])[:,newaxis]
+		q = Ket(Sum(self.samples))
+		zs = q.prms()
+		hs = self.z*1e-4*eye(len(zs))
+		self.expected = empty((basis.size, zs.size), dtype=complex)
+		for n in xrange(len(zs)):
+			self.expected[:,n:n+1] = basis*(q.smrp(zs+hs[n,:]) - q.smrp(zs-hs[n,:]))
+		self.computed = 2*hs[0,0] * dot(basis, q.D())
+		assert closenough(self.expected, self.computed)
+
 #class CoherentStateScalingTest(SingleModeCase):
 #	"Verify that norms of coherent states are linear in scalar multiplication"
 #	def runTest(self):
