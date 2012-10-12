@@ -7,9 +7,12 @@ from cmath import *
 ##################################################
 
 def row(elts):
+	# should this take a conjugate?
+	elts = list(elts)
 	return Matrix(1, len(elts), elts)
 
 def col(elts):
+	elts = list(elts)
 	return Matrix(len(elts), 1, elts)
 
 def dot(xs, ys):
@@ -68,6 +71,7 @@ class Matrix(object):
 			
 	def matmul(self, other):
 		assert self.wd is other.ht
+		# the conjugate in dot reverses the one in rows
 		return Matrix(self.ht, other.wd,
 			(dot(r, c) for c in other.cols() for r in self.rows()))
 			
@@ -93,6 +97,9 @@ class Braket(object):
 	def __add__(self, other):
 		assert isinstance(other, type(self))
 		return type(self)(self.s+other.s)
+
+	def __sub__(self, other):
+		return self + (-1*other)
 				
 			
 class Bra(Braket):
@@ -135,6 +142,19 @@ class Ket(Braket):
 		
 	def conjugate(self):
 		return Bra(self.s)
+		
+	def prms(self):
+		return col(self.s.prms())
+		
+	def smrp(self, zs):
+		assert isinstance(zs, Matrix) and zs.wd == 1
+		return Ket(self.s.smrp(zs.elts))
+		
+	def D(self):
+		return row(Ket(s) for s in self.s.D())
+		
+	def C(self):
+		return col([Ket(FockExpansion(0))]*len(self.s.prms()))
 			
 
 ##################################################
@@ -148,6 +168,9 @@ class Operator(object):
 		"bfun transforms bra states, kfun ket states"
 		self.bfun = bfun
 		self.kfun = kfun
+
+	def __sub__(self, other):
+		return self + (-1*other)
 		
 	def __add__(self, other):
 		if isinstance(other, Operator):
@@ -163,8 +186,8 @@ class Operator(object):
 		elif isinstance(other, Ket):
 			return Ket(self.kfun(other.s))
 		elif dirac_scalar(other):
-			return Operator(lambda b: other*self.bfun(b),
-				lambda k: other*self.kfun(k))
+			return Operator(lambda b: self.bfun(b).scaled(other.conjugate()),
+				lambda k: self.kfun(k).scaled(other))
 		else:
 			return NotImplemented
 			
@@ -172,8 +195,7 @@ class Operator(object):
 		if isinstance(other, Bra):
 			return Bra(self.bfun(other.s))
 		elif dirac_scalar(other):
-			return Operator(lambda b: other*self.bfun(b),
-				lambda k: other*self.kfun(k))
+			return self*other
 		else:
 			return NotImplemented
 			
@@ -190,20 +212,25 @@ lop = Operator(lambda b: b.raised(), lambda k: k.lowered())
 #
 ##################################################
 
+def madd(*terms):
+	return sum((x if x else 0) for x in terms)
+
 class State(object):
 	pass
 
 class FockExpansion(State):
 	def __init__(self, *cs):
-		self.cs = cs
+		self.cs = tuple(complex(c) for c in cs)
 		
 	def __repr__(self):
 		return "FockExpansion(" + \
-			", ".join(repr(c) for c in self.cs) + ")"
+			", ".join((repr(c) if c else "0") for c in self.cs) + ")"
 		
 	def __add__(self, other):
-		assert isinstance(other, type(self))
-		return FockExpansion(*(z+w for z, w in zip(self.cs, other.cs)))
+		if isinstance(other, FockExpansion):
+			return FockExpansion(*(madd(z,w) for z, w in map(None, self.cs, other.cs)))
+		else:
+			return NotImplemented
 		
 	def __mul__(self, other):
 		if isinstance(other, FockExpansion):
@@ -221,16 +248,154 @@ class FockExpansion(State):
 	
 	def scaled(self, z):
 		return FockExpansion(*(c*z for c in self.cs))
+		
+	def isvac(self):
+		return all(z == 0 for z in self.cs[1:])
 			
 
 ##################################################
 #
-#	coherent states and similar
+#	displaced Fock expansions
 #
 ##################################################
 
 class DisplacedState(State):
-	def __init__(self, s, a):
-		assert isinstance(s, FockExpansion)
+	"state s, displaced by coherent amplitude a"
+	def __init__(self, a, s):
 		self.s = s
-		self.a = a
+		self.a = complex(a)
+
+	def __repr__(self):
+		return "DisplacedState(%s, %s)" % (repr(self.a), repr(self.s))
+		
+	def __add__(self, other):
+		if isinstance(other, DisplacedState) and other.a == self.a:
+			return DisplacedState(self.a, self.s + other.s)
+		elif isinstance(other, DisplacedState):
+			return Sum(self, other)
+		elif isinstance(other, FockExpansion):
+			return self + DisplacedState(0, other)
+		else:
+			return NotImplemented
+			
+	def __radd__(self, other):
+		if isinstance(other, FockExpansion):
+			return self + other
+		else:
+			return NotImplemented
+			
+	def __mul__(self, other):
+		if isinstance(other, DisplacedState):
+			return ddmul(self, other)
+		elif isinstance(other, FockExpansion):
+			return ddmul(self, DisplacedState(0, other))
+		else:
+			return NotImplemented
+			
+	def __rmul__(self, other):
+		if isinstance(other, FockExpansion):
+			return ddmul(DisplacedState(0, other), self)
+		else:
+			return NotImplemented
+			
+	def scaled(self, z):
+		return DisplacedState(self.a, self.s.scaled(z))
+		
+	def lowered(self):
+		return DisplacedState(self.a, self.s.lowered() + self.s.scaled(self.a))
+		
+	def raised(self):
+		return DisplacedState(self.a, self.s.raised() + self.s.scaled(self.a.conjugate()))
+		
+	def prms(self):
+		assert self.s.isvac()
+		return (-0.5*abs(self.a)**2 + log(FockExpansion(1)*self.s), self.a)
+		
+	def smrp(self, zs):
+		assert self.s.isvac()
+		return DisplacedState(zs[1], FockExpansion(exp(zs[0]+0.5*abs(self.a)**2)))
+		
+	def D(self):
+		return (self, self.raised())
+			
+def ddmul(bra, ket):
+	# see soften.tex
+	b, a = bra.a, ket.a
+	return  exp(-0.5*abs(a-b)**2) * (
+		explower((a-b).conjugate(), bra.s) *
+		explower(-(a-b).conjugate(), ket.s))
+		
+def explower(z, s):
+	# ensure exp(a)|s> is a finite polynomial
+	assert isinstance(s, FockExpansion)
+	sm, term, n = s, s.lowered().scaled(z), 1
+	while abs(term*term) > 0:
+		sm += term
+		n += 1
+		term = term.lowered().scaled(z/n)
+	return sm
+			
+
+##################################################
+#
+#	sums of displaced states
+#
+##################################################
+
+class Sum(State):
+	def __init__(self, *ts):
+		self.ts = {}
+		for s in ts:
+			if isinstance(s, FockExpansion):
+				s = DisplacedState(0, s)
+			assert isinstance(s, DisplacedState)
+			self.ts[s.a] = \
+				self.ts[s.a] + s if s.a in self.ts else s
+				
+	def terms(self):
+		return self.ts.values()
+				
+	def __repr__(self):
+		return "Sum(" + ", ".join(repr(s) for s in self.terms()) + ")"
+		
+	def __add__(self, other):
+		if isinstance(other, Sum):
+			return Sum(*self.terms() + other.terms())
+		elif isinstance(other, State):
+			return Sum(*self.terms() + [other])
+		else:
+			return NotImplemented
+			
+	def __radd__(self, other):
+		assert isinstance(other, State)
+		return self + other
+		
+	def scaled(self, z):
+		return Sum(*(s.scaled(z) for s in self.terms()))
+		
+	def __mul__(self, other):
+		assert isinstance(other, State)
+		if not isinstance(other, Sum):
+			other = Sum(other)
+		return sum(b*k for b in self.terms() for k in other.terms())
+		
+	def __rmul__(self, other):
+		assert isinstance(other, State)
+		if not isinstance(other, Sum):
+			other = Sum(other)
+		return sum(b*k for b in other.terms() for k in self.terms())
+		
+	def prms(self):
+		return tuple(z for s in self.terms() for z in s.prms())
+		
+	def smrp(self, zs):
+		s = Sum()
+		for t in self.terms():
+			n = len(t.prms())
+			s = s + t.smrp(zs[:n])
+			zs = zs[n:]
+		return s
+		
+	def D(self):
+		return tuple(t for s in self.terms() for t in s.D())
+		
