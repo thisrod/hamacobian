@@ -48,6 +48,11 @@ class Matrix(object):
 		return ([z.conjugate() for z in self.elts[n::self.ht]]
 			for n in xrange(self.ht))
 			
+	def indices(self):
+		for n in xrange(self.wd):
+			for m in xrange(self.ht):
+				yield m, n
+			
 	def __add__(self, other):
 		assert isinstance(other, type(self))
 		assert self.ht is other.ht
@@ -70,6 +75,10 @@ class Matrix(object):
 			return self.scamul(other)
 		else:
 			return NotImplemented
+			
+	def __div__(self, other):
+		assert matrix_scalar(other)
+		return self.mulsca(1./other)
 			
 	def mulsca(self, z):
 		return Matrix(self.ht, self.wd, (x*z for x in self.elts))
@@ -413,3 +422,10 @@ class Sum(State):
 	def raised(self):
 		return Sum(*[t.raised() for t in self.terms()])
 		
+		
+def norm(q):
+	x = q.conjugate() * q
+	if isinstance(x, Matrix):
+		assert x.ht is 1 and x.wd is 1
+		x = x.elts[0]
+	return abs(sqrt(x))
