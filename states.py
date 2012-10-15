@@ -16,7 +16,12 @@ def col(elts):
 	return Matrix(len(elts), 1, elts)
 
 def dot(xs, ys):
-	return sum(x.conjugate()*y for (x, y) in zip(xs, ys))
+	# builtin sum breaks operator overloading
+	# it is an error to use dot with empty lists of things other than numbers
+	if min(len(xs), len(ys)) is 0:
+		return 0j
+	else:
+		return reduce(lambda a,b: a+b, (x.conjugate()*y for (x, y) in zip(xs, ys)))
 	
 def matrix_scalar(z):
 	return all(not isinstance(z, T) for T in [Matrix, State])
@@ -47,7 +52,10 @@ class Matrix(object):
 		assert isinstance(other, type(self))
 		assert self.ht is other.ht
 		assert self.wd is other.wd
-		return Matrix(self.ht, other.wd, (x+y for x in self.elts for y in other.elts))
+		return Matrix(self.ht, other.wd, (x+y for x,y in zip(self.elts, other.elts)))
+
+	def __sub__(self, other):
+		return self + (-1*other)
 			
 	def __mul__(self, other):
 		if isinstance(other, Matrix):
@@ -313,7 +321,7 @@ class DisplacedState(State):
 		
 	def smrp(self, zs):
 		assert self.s.isvac()
-		return DisplacedState(zs[1], FockExpansion(exp(zs[0]+0.5*abs(self.a)**2)))
+		return DisplacedState(zs[1], FockExpansion(exp(zs[0]+0.5*abs(zs[1])**2)))
 		
 	def D(self):
 		return (self, self.raised())
@@ -321,7 +329,7 @@ class DisplacedState(State):
 def ddmul(bra, ket):
 	# see soften.tex
 	b, a = bra.a, ket.a
-	return  exp(-0.5*abs(a-b)**2) * (
+	return  exp(-0.5*abs(a)**2-0.5*abs(b)**2+b.conjugate()*a) * (
 		explower((a-b).conjugate(), bra.s) *
 		explower(-(a-b).conjugate(), ket.s))
 		
@@ -398,4 +406,10 @@ class Sum(State):
 		
 	def D(self):
 		return tuple(t for s in self.terms() for t in s.D())
+
+	def lowered(self):
+		return Sum(*[t.lowered() for t in self.terms()])
+
+	def raised(self):
+		return Sum(*[t.raised() for t in self.terms()])
 		
