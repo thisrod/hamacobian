@@ -1,4 +1,6 @@
 from cmath import *
+import numbers
+import numpy
 
 ##################################################
 #
@@ -79,6 +81,10 @@ class Matrix(object):
 	def __div__(self, other):
 		assert matrix_scalar(other)
 		return self.mulsca(1./other)
+
+	def __array__(self):
+		assert all(isinstance(z, numbers.Complex) for z in self.elts)
+		return numpy.array(self.elts).reshape((self.wd, self.ht)).T
 			
 	def mulsca(self, z):
 		return Matrix(self.ht, self.wd, (x*z for x in self.elts))
@@ -117,6 +123,9 @@ class Braket(object):
 
 	def __sub__(self, other):
 		return self + (-1*other)
+		
+	def __div__(self,other):
+		return self*(1./other)
 				
 			
 class Bra(Braket):
@@ -421,7 +430,13 @@ class Sum(State):
 
 	def raised(self):
 		return Sum(*[t.raised() for t in self.terms()])
-		
+	
+	
+##################################################
+#
+#	utilities
+#
+##################################################
 		
 def norm(q):
 	x = q.conjugate() * q
@@ -429,3 +444,9 @@ def norm(q):
 		assert x.ht is 1 and x.wd is 1
 		x = x.elts[0]
 	return abs(sqrt(x))
+
+def coherent(alpha):
+	return DisplacedState(alpha, FockExpansion(1))
+
+def number(n):
+	return FockExpansion(*[0]*n + [1])
