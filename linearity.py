@@ -15,7 +15,10 @@ dst = [abs(exp(x)) for x in pylab.linspace(log(1e-4), log(5), 50)]
 v = FockExpansion(1)
 q = Ket(Sum(*(DisplacedState(randc(), v) for i in xrange(R))))
 
-for p in xrange(7):
+m = []	# slopes
+rpts = 7
+
+for p in xrange(rpts):
 	# choose a random direction
 	drn = col(randc() for i in q.prms().indices())
 	drn /= norm(drn)
@@ -26,6 +29,10 @@ for p in xrange(7):
 		shft = q.smrp(q.prms()+h*drn) - q
 		lin = (q.D()*h*drn).elts[0]
 		rslt[h] = norm(shft - lin)/norm(lin)
+
+	# slope in the quadratic region between 1e-3 and 1e-2
+	m.append( (log(rslt[dst[21]]) - log(rslt[dst[10]])) / \
+		(log(dst[21]) - log(dst[10])) )
 		
 	x = rslt.keys()
 	x.sort()
@@ -35,5 +42,7 @@ for p in xrange(7):
 pylab.title('%d coherent states linearly approximated in random directions' % R)
 pylab.xlabel('norm of parameter shift')
 pylab.ylabel('relative error in linear approximation')
+pylab.text(0.001, 0.01, "slope %.3f pm %.3f" % 
+	(sum(m).real/len(m), sqrt(sum(x**2 for x in m)/rpts - sum(m)**2/rpts**2).real))
 	
 pylab.show()
