@@ -110,7 +110,7 @@ class Matrix(object):
 
 	def __array__(self):
 		assert all(isinstance(z, numbers.Complex) for z in self.elts)
-		return numpy.array(self._rws())
+		return numpy.array([r for r in self._rws()])
 			
 	def mulsca(self, z):
 		return Matrix(self.ht, self.wd, (x*z for x in self.elts))
