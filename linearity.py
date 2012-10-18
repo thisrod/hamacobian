@@ -27,7 +27,7 @@ for p in xrange(rpts):
 	rslt = {}
 	for h in dst:
 		shft = q.smrp(q.prms()+h*drn) - q
-		lin = (q.D()*h*drn).elts[0]
+		lin = q.D()*h*drn
 		rslt[h] = norm(shft - lin)/norm(lin)
 
 	# slope in the quadratic region between 1e-3 and 1e-2

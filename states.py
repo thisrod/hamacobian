@@ -9,7 +9,6 @@ import numpy
 ##################################################
 
 def row(elts):
-	# should this take a conjugate?
 	elts = list(elts)
 	return Matrix(1, len(elts), elts)
 
@@ -18,7 +17,6 @@ def col(elts):
 	return Matrix(len(elts), 1, elts)
 
 def dot(xs, ys):
-	# builtin sum breaks operator overloading
 	# it is an error to use dot with empty lists of things other than numbers
 	if min(len(xs), len(ys)) is 0:
 		return 0j
@@ -28,27 +26,55 @@ def dot(xs, ys):
 def matrix_scalar(z):
 	return all(not isinstance(z, T) for T in [Matrix, State])
 
+# scalar strategy: there are no 1x1 matrices, these drop to scalars.
+# rows and cols return iterators over matrices (or scalars, in the 1x1 case) 
+# _rows and _cols return iterators over lists; _rows are not conjugated
+# iterating over a row or column does the obvious
+
 class Matrix(object):
+
+	def __new__(cls, m, n, elts):
+		if m*n == 1:
+			return iter(elts).next()
+		else:
+			return object.__new__(cls, m, n, elts)
 
 	def __init__(self, m, n, elts):
 		"elts are in column major order"
-		
-		self.ht, self.wd, self.elts = m, n, list(elts)
-		assert len(self.elts) is m*n
+		elts = list(elts)
+		assert len(elts) == m*n
+		self.ht, self.wd, self.elts = m, n, elts
 		
 	def __repr__(self):
-		return "Matrix(%d, %d, [" % (self.ht, self.wd) + \
-			", ".join(repr(e) for e in self.elts) + \
-			"])"
+		if self.wd == 1:
+			return "col(" +  "; ".join(repr(e) for e in self.elts) + ")"
+		elif self.ht == 1:
+			return "row(" +  ", ".join(repr(e) for e in self.elts) + ")"
+		else:
+			return "Matrix(%d, %d, [" % (self.ht, self.wd) + \
+				";   ".join(", ".join(repr(e) for e in r) for r in self._rws()) + \
+				"])"
 		
 	def cols(self):
-		return (self.elts[n*self.ht:(n+1)*self.ht]
-			for n in xrange(self.wd))
+		return (col(x) for x in self._cols())
+
+	def _cols(self):
+		for n in xrange(self.wd):
+			yield self.elts[n*self.ht:(n+1)*self.ht]
 				
 	def rows(self):
-		# Trefethen & Bau shows that you usually want conjugated rows
-		return ([z.conjugate() for z in self.elts[n::self.ht]]
-			for n in xrange(self.ht))
+		return (row(x) for x in self._rows())
+		
+	def _rows(self):
+		return ([z.conjugate() for z in r] for r in self._rws())
+			
+	def _rws(self):
+		for n in xrange(self.ht):
+			yield self.elts[n::self.ht]
+			
+	def __iter__(self):
+		assert self.ht == 1 or self.wd == 1
+		return iter(self.elts)
 			
 	def indices(self):
 		for n in xrange(self.wd):
@@ -56,7 +82,7 @@ class Matrix(object):
 				yield m, n
 			
 	def __add__(self, other):
-		assert isinstance(other, type(self))
+		assert isinstance(other, Matrix)
 		assert self.ht is other.ht
 		assert self.wd is other.wd
 		return Matrix(self.ht, other.wd, (x+y for x,y in zip(self.elts, other.elts)))
@@ -84,7 +110,7 @@ class Matrix(object):
 
 	def __array__(self):
 		assert all(isinstance(z, numbers.Complex) for z in self.elts)
-		return numpy.array(self.elts).reshape((self.wd, self.ht)).T
+		return numpy.array(self._rws())
 			
 	def mulsca(self, z):
 		return Matrix(self.ht, self.wd, (x*z for x in self.elts))
@@ -96,11 +122,11 @@ class Matrix(object):
 		assert self.wd is other.ht
 		# the conjugate in dot reverses the one in rows
 		return Matrix(self.ht, other.wd,
-			(dot(r, c) for c in other.cols() for r in self.rows()))
+			(dot(r, c) for c in other._cols() for r in self._rows()))
 			
 	def conjugate(self):
 		return Matrix(self.wd, self.ht,
-			(z for r in self.rows() for z in r))
+			(z for r in self._rows() for z in r))
 		
 			
 ##################################################
@@ -439,11 +465,7 @@ class Sum(State):
 ##################################################
 		
 def norm(q):
-	x = q.conjugate() * q
-	if isinstance(x, Matrix):
-		assert x.ht is 1 and x.wd is 1
-		x = x.elts[0]
-	return abs(sqrt(x))
+	return abs(sqrt(q.conjugate() * q))
 
 def coherent(alpha):
 	return DisplacedState(alpha, FockExpansion(1))
