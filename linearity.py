@@ -9,7 +9,7 @@ def randc():
 	return gauss(0,1) + gauss(0,1)*1j
 
 R = int(argv[1])		# number of states in ensemble
-dst = [abs(exp(x)) for x in pylab.linspace(log(1e-5), log(5), 50)]
+dst = [abs(exp(x)) for x in pylab.linspace(log(1e-5), log(5), 5)]
 basis = col(Bra(number(n)) for n in xrange(20))
 
 # choose a random ensemble

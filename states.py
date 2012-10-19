@@ -127,6 +127,9 @@ class Matrix(object):
 	def conjugate(self):
 		return Matrix(self.wd, self.ht,
 			(z for r in self._rows() for z in r))
+
+	def map(self, f):
+		return Matrix(self.ht, self.wd, (f(x) for x in self.elts))
 		
 			
 ##################################################
