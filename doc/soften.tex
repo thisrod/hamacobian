@@ -2,6 +2,8 @@
 \input amssym
 \input xpmath
 
+% xetex soften && open soften.pdf
+
 \def\z{z}
 \def\D{D}
 
@@ -116,20 +118,31 @@ We can discretise using coherent states because harmonic oscillators have a natu
 
 Squeezed states might be useful, too.  You can think about reducing the amplitude, and increasing the duration, so that the area under the Gaussian stays the same.
 
+\beginsection{Stability}
+
+When the {\tt states.py} library computes the norm of $$e^{h⁰}|α+h¹〉-|α〉-|Dα〉h,$$ it splits this into the terms $|x〉=e^{h⁰}|α+h¹〉$ and $|y〉=(1+h⁰+h¹a†)|α〉$, and computes $〈x|x〉+〈y|y〉-〈x|y〉-〈y|x〉$.  The terms are 
+$$〈x|x〉=\exp(2\Re h⁰)=1+2\Re h⁰+2(\Re h⁰)²+O(|h|³)$$ 
+$$〈y|y〉=|1+h⁰|²+|h¹|²(1+|α|²)+2\Re(1+{h⁰}*)h¹α*
+	=1+2\Re (h⁰+h¹α*)+|h|²+|h¹α|²+2\Re {h⁰}*h¹α*+O(|h|³)$$ 
+and $$\eqalign{〈x|y〉&=e^{{h⁰}*}(1+h⁰+h¹(α+h¹)*)〈α+h¹|α〉\cr
+	&=(1+h⁰+h¹(α+h¹)*)\exp({h⁰}*-½|α|²-½|α+h¹|²+(α+h¹)*α) \cr
+	&=(1+h⁰+h¹α*+|h¹|²)\exp({h⁰}*-½|h¹|²+\Im{h¹}*α) {\rm etc.}}$$
+These four terms are $O(1)$; the square root of their sum is $O(h²)$, so their sum must be $O(h⁴)$.  Therefore, the relative stability of the second order difference computed this way is $O(ε_n^{¼})$.  For the Python interpreter, this is $10^{-4}$, which is about the error seen in the script.  Expanding both terms over an orthogonal basis, and adding in quadrature, gives quantities of $O(h⁴)$, with a sum of $O(h⁴)$.  The stability of that method is thus $O(ε_n)$, which is $2×10^{-16}$ for Python.
+
+This could be fixed.  {\tt Sum} would combine states with similar displacements, with a common displacement of the weighted average.  The relative displacement operators would be expanded as Taylor series, and applied to the {\tt FockExpansion}.  The details would be hard work, especially for multimode states, so I won't do that until necessary.
+
+
+
 \beginsection{Implementation}
 
-Most of the above notation is implemented by Numpy, which affords arrays of objects of arbitrary type.  All that is lacking is classes to represent bras and kets.  My library is based on a class {\tt State}, and wrappers {\tt Bra} and {\tt Ket} that conjugate scalars where necessary.  These are subclasses of {\tt QO}, which exists to dispatch addition and multiplication operators, to turn $a-b$ into $a+(-1*b)$, and that kind of thing.
+The library in the module {\tt states.py} is based on a class {\tt State}, representing a quantum state regardless of it being a bra or a ket.  In practice, {\tt State} implements a ket: its methods are called directly by the class {\tt Ket}, and with conjugated arguments by the class {\tt Bra}.  Subclasses of {\tt State} represent classes of kets in specific ways.  The subclass {\tt FockExpansion} expands a state over number states, {\tt Sum} is exactly what it sounds like, and {DisplacedState} represents a state of the form $D(α)|ψ〉$, where $|ψ〉$ is represented by another subclass.
 
-In principle, {\tt State} represents an abstract quantum state, which could be either a bra or a ket.  In practice, it implements a ket, whose methods are called directly by the class {\tt Ket}, and with conjugated arguments by the class {\tt Bra}.  Subclasses of {\tt State} represent classes of kets in specific ways, often in terms of each other.  The class {\tt FockExpansion} expands a state over number states.  {\tt Sum} is exactly what it sounds like.  {DisplacedState} represents a state of the form $D(α)|ψ〉$, where $|ψ〉$ is represented by another subclass of {\tt State}.
-
-{\tt Bra} and {\tt Ket} implement Dirac algebra.  Scalar and inner products are associative.  Outer products are not yet implemented—no operators are—but would be a straightforward extension.  The notation above can be included in Python by making {\tt ndarray}s of these.  One ends up with lots of {\tt dot(dot(a,b), c)} type code.  This is part of the pervasive uglyness that Python's sugar-loaded syntax and half-baked operator overloading inflict on the world.
-
-Computing a derivative is straighforward: the method $D$ returns an array of partial derivatives of a {\tt Bra} or {\tt Ket} with respect to its parameters.  Subclasses of {\tt State} have different parameters, according to how they represent the state.  An array of these is returned by the method {\tt params}.  The method {\tt smarap} takes such an array, and constructs a state similar to the receiver, with the supplied parameters.  I haven't thought through the subtleties of bras and conjugation; the current code fails this test, so I'm probably getting it wrong.
+{\tt Bra}, {\tt Ket} and {\tt Operator} implement Dirac algebra.  Scalar and inner products are associative.  Outer products are not yet implemented, but would be a straightforward extension.  The notation above is implemented by the class {Matrix}.  It should be possible to do it with {\tt ndarray} of {\tt Bra} or {\tt Ket}, but the Numpy code for general objects is so buggy that it's easier to write one's own.
 
 Addition of {\tt State} is entirely straightforward: it forms a superposition, by returning the {\tt Sum} of the operands if need be.  When two {\tt State}s multiply, the left operand is treated as a bra, and the right one as a ket.  This has some tricky consequences.  Let $z$ be a scalar, {\tt A} a {\tt State} representing $|a〉$, and {\tt B} one representing $|b〉$.  Then {\tt z*(A*B)} and {\tt A*(z*b)} both evaluate to the Dirac product $z〈a|b〉$, but the very tempting {\tt (z*A)*B} evaluates to $z*〈a|b〉$, because {\tt z*A} represents the bra $〈a|z*$.  Therefore, products between states and scalars are not directly supported: one must say {\tt A.scaled(z)}, a reminder that one might mean {\tt A.scaled(conjugate(z))}.
 
-Products of {\tt DisplacedState} are computed according to $$\eqalign{D†(β)D(α)&=D(-β)D(α)=e^{-βa†+β*a}e^{αa†-α*a} \cr &=e^{[-βa†+β*a,αa†-α*a]/2}e^{(α-β)a†-(α-β)*a} \cr &=e^{(β*α-βα*)/2}D(α-β)=e^{(β*α-βα*-(α*-β*)(α-β))/2}e^{(α-β)a†}e^{-(α-β)*a}\cr &=e^{-½(|α|²+|β|²)+β*α}e^{(α-β)a†}e^{-(α-β)*a}.}$$
+Products of {\tt DisplacedState} are computed according to $$\eqalign{D†(β)D(α)&=D(-β)D(α)=e^{-βa†+β*a}e^{αa†-α*a} \cr &=e^{[-βa†+β*a,αa†-α*a]/2}e^{(α-β)a†-(α-β)*a} \cr &=e^{(β*α-βα*)/2}D(α-β)=e^{(β*α-βα*-(α*-β*)(α-β))/2}e^{(α-β)a†}e^{-(α-β)*a}\cr &=e^{-½(|α|²+|β|²)+β*α}e^{(α-β)a†}e^{-(α-β)*a}.}$$  Products of sums are computed by adding products of terms: this has consequences for stability, that were discussed above.
 
-Coherent states, and sums of them, are implicitly functions of logarithmic weights and coherent amplitudes.  The parameters are returned by {\tt q.prms()}, and a modified state is constructed by, say, {\tt q.smrp(q.prms() + h)}.  The method {\tt State.prms} returns a tuple, {\tt Ket.prms} returns a column, and {\tt Bra.prms} a row.  Wannier calculus is implemented by the methods {\tt D} and {\tt C}, such that {\tt q.smrp(q.prms() + h)} is approximated by {\tt q + q.D()*h + h.conjugate()*q.C()} for small {\tt h}.  
+Coherent states, and sums of them, have parameters that are logarithmic weights and coherent amplitudes.  The parameters are returned by {\tt q.prms()}, and a modified state is constructed by, say, {\tt q.smrp(q.prms() + h)}.  The method {\tt State.prms} returns a tuple, {\tt Ket.prms} returns a column, and {\tt Bra.prms} a row.  Wirtinger calculus is implemented by the methods {\tt D} and {\tt C}, such that {\tt q.smrp(q.prms() + h)} is approximated by {\tt q + q.D()*h + h.conjugate()*q.C()} for small {\tt h}.  These can be multiplied on the right by small changes in parameters.  Usually, {\tt C()} is zero for a ket, and {\tt D()} is zero for a bra.
 
 \bye
