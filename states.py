@@ -108,9 +108,9 @@ class Matrix(object):
 		assert matrix_scalar(other)
 		return self.mulsca(1./other)
 
-	def __array__(self):
+	def __array__(self, dtype=complex):
 		assert all(isinstance(z, numbers.Complex) for z in self.elts)
-		return numpy.array([r for r in self._rws()])
+		return numpy.array([r for r in self._rws()], dtype)
 			
 	def mulsca(self, z):
 		return Matrix(self.ht, self.wd, (x*z for x in self.elts))
