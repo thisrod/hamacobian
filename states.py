@@ -1,37 +1,73 @@
-from cmath import *
+"""
+Dirac algebra
+
+This module implements bras, kets, linear operators and matrices of
+those things.
+"""
+
+from cmath import exp, log
+from math import sqrt
 import numbers
+
 import numpy
 
-##################################################
-#
-#	matrices of objects
-#
-##################################################
 
-def row(elts):
-	elts = list(elts)
-	return Matrix(1, len(elts), elts)
+# Matrices
 
-def col(elts):
-	elts = list(elts)
-	return Matrix(len(elts), 1, elts)
+def row(x):
+	"""Return a 1*len(x) Matrix sharing elements with x."""
+	x = list(x)
+	return Matrix(1, len(x), x)
+
+def col(x):
+	"""Return a len(x)*1 Matrix sharing elements with x."""
+	x = list(x)
+	return Matrix(len(x), 1, x)
 
 def dot(xs, ys):
-	# it is an error to use dot with empty lists of things other than numbers
+	"""Return the complex inner product of two sequences.
+
+	The elements of the first sequence are conjugated. If either
+	sequence is empty, return 0j.
+	"""
 	if min(len(xs), len(ys)) is 0:
 		return 0j
 	else:
-		return reduce(lambda a,b: a+b, (x.conjugate()*y for (x, y) in zip(xs, ys)))
+		return reduce(
+			lambda a,b: a+b,
+			(x.conjugate()*y for (x, y) in zip(xs, ys)))
 	
-def matrix_scalar(z):
+def _matrix_scalar(z):
+	# Test if z is a scalar in regard to matrix multiplication
 	return all(not isinstance(z, T) for T in [Matrix, State])
 
-# scalar strategy: there are no 1x1 matrices, these drop to scalars.
-# rows and cols return iterators over matrices (or scalars, in the 1x1 case) 
-# _rows and _cols return iterators over lists; _rows are not conjugated
-# iterating over a row or column does the obvious
 
 class Matrix(object):
+
+	"""Matrices of arbitrary objects.
+	
+	In a perfect world, matrices and vectors of Bras and Kets would be
+	Numpy arrays with dtype=object. Numpy is sufficiently imperfect that
+	it is easier to define an ad hoc Matrix class than to work around it.
+
+	The size of a matrix A is A.ht * A.wd. Its elements are stored in
+	column-major order in the list A.elts. Iterating over a row or column
+	vector yields its elements.
+
+	Two matrices can be added and multiplied with the usual linear algebra
+	operators. They can be multiplied by scalars. A scalar is anything
+	except a matrix or a State; States should always be held in Bras or
+	Kets. Matrices are array-like for Numpy purposes, and Numpy's linear
+	algebra operations can be applied to a Matrix of numbers as is. Binary
+	operations are unlikely to work.
+
+	There are no 1*1 Matrices - the element is returned as a scalar
+	instead. This is useful more often than it gets in the way.
+
+	Following the convention of Trefethen & Bau, the rows of a matrix are
+	complex conjugated. This is almost always what you want.
+
+	"""
 
 	def __new__(cls, m, n, elts):
 		if m*n == 1:
@@ -40,7 +76,7 @@ class Matrix(object):
 			return object.__new__(cls, m, n, elts)
 
 	def __init__(self, m, n, elts):
-		"elts are in column major order"
+		"""Return an m*n matrix, containing elts in column-major order."""
 		elts = list(elts)
 		assert len(elts) == m*n
 		self.ht, self.wd, self.elts = m, n, elts
@@ -56,6 +92,7 @@ class Matrix(object):
 				"])"
 		
 	def cols(self):
+		"""Return the columns as an iterator over self.ht*1 matrices."""
 		return (col(x) for x in self._cols())
 
 	def _cols(self):
@@ -63,6 +100,7 @@ class Matrix(object):
 			yield self.elts[n*self.ht:(n+1)*self.ht]
 				
 	def rows(self):
+		"""Return the conjugated rows as an iterator over 1*self.wd matrices."""
 		return (row(x) for x in self._rows())
 		
 	def _rows(self):
@@ -77,6 +115,8 @@ class Matrix(object):
 		return iter(self.elts)
 			
 	def indices(self):
+		"""Return an iterator of (row, column) pairs, in column-major order.
+"""
 		for n in xrange(self.wd):
 			for m in xrange(self.ht):
 				yield m, n
@@ -92,39 +132,40 @@ class Matrix(object):
 			
 	def __mul__(self, other):
 		if isinstance(other, Matrix):
-			return self.matmul(other)
-		elif matrix_scalar(other):
-			return self.mulsca(other)
+			return self._matmul(other)
+		elif _matrix_scalar(other):
+			return self._mulsca(other)
 		else:
 			return NotImplemented
 			
 	def __rmul__(self, other):
-		if matrix_scalar(other):
-			return self.scamul(other)
+		if _matrix_scalar(other):
+			return self._scamul(other)
 		else:
 			return NotImplemented
 			
 	def __div__(self, other):
-		assert matrix_scalar(other)
-		return self.mulsca(1./other)
+		assert _matrix_scalar(other)
+		return self._mulsca(1./other)
 
 	def __array__(self, dtype=complex):
 		assert all(isinstance(z, numbers.Complex) for z in self.elts)
 		return numpy.array([r for r in self._rws()], dtype)
 			
-	def mulsca(self, z):
+	def _mulsca(self, z):
 		return Matrix(self.ht, self.wd, (x*z for x in self.elts))
 			
-	def scamul(self, z):
+	def _scamul(self, z):
 		return Matrix(self.ht, self.wd, (z*x for x in self.elts))
 			
-	def matmul(self, other):
+	def _matmul(self, other):
 		assert self.wd is other.ht
 		# the conjugate in dot reverses the one in rows
 		return Matrix(self.ht, other.wd,
 			(dot(r, c) for c in other._cols() for r in self._rows()))
 			
 	def conjugate(self):
+		"""Return the Hermitian conjugate."""
 		return Matrix(self.wd, self.ht,
 			(z for r in self._rows() for z in r))
 
@@ -468,7 +509,7 @@ class Sum(State):
 ##################################################
 		
 def norm(q):
-	return abs(sqrt(q.conjugate() * q))
+	return sqrt(abs(q.conjugate() * q))
 
 def coherent(alpha):
 	return DisplacedState(alpha, FockExpansion(1))
