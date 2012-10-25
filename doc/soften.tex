@@ -48,13 +48,26 @@ Because the Jacobian matrix $|Dψ(z)〉$ is numerically rank-deficient, least sq
 
 The mapping $|Dψ〉$ is defined by the condition $$|ψ(z+h)〉-|ψ(z)〉=|Dψ(z)〉h+O(h²);$$ if there is no such  $|Dψ(z)〉$, the function $|ψ〉$ is not differentiable at $z$.  For the matrix products to be well formed, this must be a $1×r$ vector $|Dψ〉=(|∂₁ψ〉,|∂₂ψ〉,…,|∂_rψ〉)$, where $r$ is the number of variational parameters, the length of the vector $z$.
 
+
 \beginsection{The states we compute with}
 
-The goal is to do variational mechanics, in second quantisation, using multimode coherent states.  These might be projected onto a constant total particle number.  The Hamiltonians, in second quantisation, tend to be low-degree polynomials in the creation and annihilation operators of the modes; of course, there will be very many modes for 3 dimensional systems, and thus the polynomials will have very many terms.
+The goal is to do variational mechanics, in second quantisation, using multimode coherent states.  These might be projected onto a constant total particle number.  The Hamiltonians, in second quantisation, tend to be low-degree polynomials in the creation and annihilation operators of the modes; there will be very many modes for 3 dimensional systems, and thus the polynomials will have very many terms.
 
-Do we need $P(α,α*,a†)$ or just $P(α,a†)$?  Yes: Hamiltonians.
+Consider states of the form $$|Π[P](φ,α)〉=P(α,α*,a†)\exp(φ+a†α)|0〉.$$  Here, $α$ is a column vector of amplitudes, $a$ a column vector of creation operators for the modes, and $P$ a polynomial in $3(m-1)$ variables.  Note that $a_i|Π[P](φ,α)〉=α_i|Π[P](φ,α)〉=|Π[π_iP](φ,α)〉$, and $a†_i|Π[P](φ,α)〉=|Π[π_{2m+i}P](φ,α)〉$, and $$|DΠ[P](φ,α)〉=[1,a†]|Π[P](φ,α)〉=\bigl(|Π[P](φ,α)〉,|Π[π_{2m+1}P](φ,α)〉,…,|Π[π_{3m}P](φ,α)〉\bigr).$$  Here $π_i$ is the monomial $π_i(z₁,…,z_n)=z_i$.  Accordingly, sums of such states are closed under every operation we want to perform on them.  Furthermore, their inner products can be calculated, and come out to $Q(α',α*)\exp(φ'+φ*+α*α')$, where $Q$ is a normally ordered polynomial.
 
-Consider states of the form $$|Π[P](φ,α)〉=P(α,α*,a†)\exp(φ+a†α)|0〉.$$  Here, $α$ is a column vector of amplitudes, $a$ a column vector of creation operators for the modes, and $P$ a polynomial in $3(m-1)$ variables.  Note that $a_i|Π[P](φ,α)〉=α_i|Π[P](φ,α)〉=|Π[π_iP](φ,α)〉$, and $a†_i|Π[P](φ,α)〉=|Π[π_{2m+i}P](φ,α)〉$, and $|DΠ[P](φ,α)〉=[1,a†]|Π[P](φ,α)〉=\bigl(|Π[P](φ,α)〉,|Π[π_{2m+1}P](φ,α)〉,…,|Π[π_{3m}P](φ,α)〉\bigr)$.  Here $π_i$ is the monomial $π_i(z₁,…,z_n)=z_i$.  Accordingly, linear combination of such states are closed under every operation we want to perform on them.  Furthermore, their inner products can be calculated, and come out to $Q(α',α*)\exp(φ'+φ*+α*α')$, where $Q$ is a normally ordered polynomial.  A library to manipulate such states would allow the more stable least squares algorithms to be applied directly to the problem $i\hbar|Dψ(z)〉{\dot z} = H|ψ(z)〉$.
+The Python module {\tt states} is a preliminary implementation of this.  In practice, it's easier to factor the polynomial in the raising operator through the exponential, and represent $$D(α)∑_n c_n|n〉,$$ where $D(α)$ is a displacement operator and $|n〉$ are number states.  The library currently has two limitations.  It only represents states of one mode, and the $c_n$ are restricted to complex numbers, not polynomials in $α$ and $α*$.  Relaxing either restriction on its own would be straightforward, and worthwhile.  With multiple modes, we could investigate Hubbard models.  With polynomials, we could compute the Jacobian of the map $|ψ(z)〉→\dot z$, and get a handle on the stiffness of the variational equations.
+
+To relax both at the same time would require massively multivariate polynomials.  Computing with multivariate polynomials is be an open area of research—see Stetter's textbook—but I have some ideas which should suffice for our purposes.
+
+It also has a serious numerical instability, that is intrinsic to superpositions of non-orthogonal states.  Suppose we have two states $|α〉$ and $|α+h〉$, with $h«1$, and we wish to find $||α+h〉-|α〉|$.  A stable way is to expand the states over an orthonormal basis, so that $|α〉=∑c_n|n〉$, and $|α+h〉=∑d_n|n〉$.  The $c_n$ and $d_n$ are of order 1; their differences $d_n-c_n$ are of order $h$; summing these in quadrature is stable.  So this algorithm multiplies the relative error by $h^{-1}$: we can't expect to do much better that that.
+
+The library, and the scripts that preceded it, work differently.  They calculate the quantities $〈α|α〉$, $〈α+h|α+h〉$, and $〈α|α+h〉$.  All these are of order 1.  They are combined to give $$||α+h〉-|α〉|²=〈α|α〉+〈α+h|α+h〉-2\Re 〈α|α+h〉,$$ a quantity of order $h²$.  So, in this case, our method amplifies the error by $h^{-2}$ instead of $h^{-1}$.  In other cases, say when we evaluate the quadratic difference $|α+h〉-|α〉-|Dα〉h$, things are even worse.  Some scripts amplify a floating point $ε$ of $10^{-16}$ to about $10^{-4}$!
+
+Fortunately, there are ways to fix this instability.  Because we're representing displaced sums of Fock states, we can combine states with similar amplitudes, expand the first few terms in the Taylor series of the relative displacement operators, and apply them to the number states.  This is a disguised version of the standard algorithm for summing Gaussians, where you expand them as sums of orthogonal polynomials centred on cluster points.  Tim and Bogdan have used this, and apparently the algorithms for selecting cluster points are very well developed.  All that's needed is a {\tt stabilise} method on sum states, to do the clustering.  This would be called after numbers were substituted, immediately before the products were taken.
+
+Finally, the library is quite inefficient, when run on interpreted Python.  There are a few ways to fix this.  The easy one would be to port it to a compiled language.  Haskell and Go spring to mind.  The drawback is that we'd lose the ease of writing scripts.  The Pyplot graphics library is a pain to learn, but really useful once you figure out how it works.  Also, this is a short-term answer: when I find a stable algorithm, we'll want to run it on parallel hardware.
+
+The other road to efficiency is to write a library for block-pattern matrices.  When a matrix decomposes into blocks, and each block is computed in a similar way from parameters—in coherent DFM, the elements are polynomials in the parameters, and the whole block is multiplied by an exponentiated polynomial—then you can compute the pattern once, and hand it and the parameters to a kernel, that generates the matrix efficiently.  You can even reuse the same pattern at every timestep.  This would make the parallel port as simple as possible; we'd just have to port the kernel.  This approach would be more complicated if SVDs or clustered sum states were used; but doing those things in parallel is essentially complex.
 
 
 \beginsection{How Dirac-Frenkel fails}
@@ -117,20 +130,6 @@ The Dirac-Frenkel approach, as we use it, treats time differently than phase spa
 We can discretise using coherent states because harmonic oscillators have a natural scale in phase space, set by the uncertainty principle and the symmetry of the Hamiltonian with respect to phase.  But Harmonic oscillators also have a natural scale in time: their frequency.  We could represent the state, over the simulation interval, as the sum of a discrete set of coherent states, whose amplitudes vary in time as Gaussians, with width $ω⁻¹$.  These would be adjusted variationally to minimise the integral of the residual of Schrödinger's equation, with some constraint on the initial state.  We could sample the initial state, fix those amplitudes, and vary the rest.
 
 Squeezed states might be useful, too.  You can think about reducing the amplitude, and increasing the duration, so that the area under the Gaussian stays the same.
-
-\beginsection{Stability}
-
-When the {\tt states.py} library computes the norm of $$e^{h⁰}|α+h¹〉-|α〉-|Dα〉h,$$ it splits this into the terms $|x〉=e^{h⁰}|α+h¹〉$ and $|y〉=(1+h⁰+h¹a†)|α〉$, and computes $〈x|x〉+〈y|y〉-〈x|y〉-〈y|x〉$.  The terms are 
-$$〈x|x〉=\exp(2\Re h⁰)=1+2\Re h⁰+2(\Re h⁰)²+O(|h|³)$$ 
-$$〈y|y〉=|1+h⁰|²+|h¹|²(1+|α|²)+2\Re(1+{h⁰}*)h¹α*
-	=1+2\Re (h⁰+h¹α*)+|h|²+|h¹α|²+2\Re {h⁰}*h¹α*+O(|h|³)$$ 
-and $$\eqalign{〈x|y〉&=e^{{h⁰}*}(1+h⁰+h¹(α+h¹)*)〈α+h¹|α〉\cr
-	&=(1+h⁰+h¹(α+h¹)*)\exp({h⁰}*-½|α|²-½|α+h¹|²+(α+h¹)*α) \cr
-	&=(1+h⁰+h¹α*+|h¹|²)\exp({h⁰}*-½|h¹|²+\Im{h¹}*α) {\rm etc.}}$$
-These four terms are $O(1)$; the square root of their sum is $O(h²)$, so their sum must be $O(h⁴)$.  Therefore, the relative stability of the second order difference computed this way is $O(ε_n^{¼})$.  For the Python interpreter, this is $10^{-4}$, which is about the error seen in the script.  Expanding both terms over an orthogonal basis, and adding in quadrature, gives quantities of $O(h⁴)$, with a sum of $O(h⁴)$.  The stability of that method is thus $O(ε_n)$, which is $2×10^{-16}$ for Python.
-
-This could be fixed.  {\tt Sum} would combine states with similar displacements, with a common displacement of the weighted average.  The relative displacement operators would be expanded as Taylor series, and applied to the {\tt FockExpansion}.  The details would be hard work, especially for multimode states, so I won't do that until necessary.
-
 
 
 \beginsection{Implementation}
