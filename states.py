@@ -202,7 +202,10 @@ class Bra(Braket):
 		if isinstance(other, Ket):
 			return self.s * other.s
 		elif dirac_scalar(other):
-			return type(self)(self.s.scaled(other.conjugate()))
+			# The conjugate below is the one that Dirac notation
+			# cleverly hides. It appears in <alpha|a^\dagger =
+			# alpha^*<alpha|, for instance. 
+			return Bra(self.s.scaled(other.conjugate()))
 		else:
 			return NotImplemented
 
@@ -211,6 +214,8 @@ class Bra(Braket):
 			return type(self)(self.s.scaled(other.conjugate()))
 		else:
 			return NotImplemented
+			
+	# D() and C() will be implemented when necessary.
 		
 	def conjugate(self):
 		return Ket(self.s)
@@ -236,16 +241,47 @@ class Ket(Braket):
 		return Bra(self.s)
 		
 	def prms(self):
+		"""Return the parameters of the state.
+
+		 This works for coherent states and superpositions of them,
+		 which are images of the representation function. The
+		 parameters of a Ket are returned in a column, in order to
+		 multiply Jacobians on the right.
+		 """
 		return col(self.s.prms())
 		
 	def smrp(self, zs):
+		"""Return a state reconstituted from parameters.
+
+		 zs is a column of parameters, similar to that returned by
+		 self.prms(). This works for coherent states and
+		 superpositions of them, which are images of the
+		 representation function.
+		 """
 		assert isinstance(zs, Matrix) and zs.wd == 1
 		return Ket(self.s.smrp(zs.elts))
 		
 	def D(self):
+		"""Return the direct Wirtinger derivative.
+
+		If prms is defined for a Ket Q, then
+			Q.smrp(q.prms() + h) ~
+				Q + Q.D()*h + h.conjugate()*Q.C()
+		In order for this to be defined, the D() method returns a row
+		of kets.
+		"""
 		return row(Ket(s) for s in self.s.D())
 		
 	def C(self):
+		"""Return the conjugate Wirtinger derivative.
+
+		If prms is defined for a Ket Q, then
+			Q.smrp(q.prms() + h) ~
+				Q + Q.D()*h + h.conjugate()*Q.C()
+		In order for this to be defined, the C() method returns a
+		column of kets. That sounds odd, but the kets have always been
+		zero so far.
+		"""
 		return col([Ket(FockExpansion(0))]*len(self.s.prms()))
 			
 
@@ -257,7 +293,10 @@ class Ket(Braket):
 
 class Operator(object):
 	def __init__(self, bfun, kfun):
-		"bfun transforms bra states, kfun ket states"
+		"""Construct a Hilbert space operator.
+
+		The function bfun applies the operator to a bra, while kfun
+		applies it to a ket."""
 		self.bfun = bfun
 		self.kfun = kfun
 
@@ -293,9 +332,10 @@ class Operator(object):
 			
 	def conjugate(self):
 		return Operator(self.kfun, self.bfun)
+
 			
-		
 lop = Operator(lambda b: b.raised(), lambda k: k.lowered())
+"""The lowering operator"""
 			
 
 ##################################################
@@ -305,7 +345,7 @@ lop = Operator(lambda b: b.raised(), lambda k: k.lowered())
 ##################################################
 
 def madd(*terms):
-	return sum((x if x else 0) for x in terms)
+	return sum((0 if x is None else x) for x in terms)
 
 class State(object):
 	pass
@@ -418,6 +458,7 @@ def ddmul(bra, ket):
 		explower(-(a-b).conjugate(), ket.s))
 		
 def explower(z, s):
+	"""Return exp(z*lop) applied to |s>."""
 	# ensure exp(a)|s> is a finite polynomial
 	assert isinstance(s, FockExpansion)
 	sm, term, n = s, s.lowered().scaled(z), 1
@@ -436,7 +477,7 @@ def explower(z, s):
 
 class Sum(State):
 	def __init__(self, *ts):
-		self.ts = {}
+		self.ts = {}		# terms indexed by their coherent amplitude
 		for s in ts:
 			if isinstance(s, FockExpansion):
 				s = DisplacedState(0, s)
@@ -505,10 +546,13 @@ class Sum(State):
 ##################################################
 		
 def norm(q):
+	"""Return the 2 norm of a Bra, Ket, or vector."""
 	return sqrt(abs(q.conjugate() * q))
 
 def coherent(alpha):
+	"""Return a coherent state with amplitude alpha."""
 	return DisplacedState(alpha, FockExpansion(1))
 
 def number(n):
+	"""Return a Fock state with n particles."""
 	return FockExpansion(*[0]*n + [1])
