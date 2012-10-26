@@ -45,8 +45,8 @@ for p in xrange(rpts):
 	pylab.loglog(dst, bss)
 	pylab.hold(True)
 	
-pylab.text(0.5, 0.7, r"slope $%f \pm %f$" % 
-	(sum(m).real/len(m), sqrt(sum(x**2 for x in m)/rpts - sum(m)**2/rpts**2).real),
-	transform = pylab.gca().transAxes)
+#pylab.text(0.5, 0.7, r"slope $%f \pm %f$" % 
+#	(sum(m).real/len(m), sqrt(sum(x**2 for x in m)/rpts - sum(m)**2/rpts**2).real),
+#	transform = pylab.gca().transAxes)
 
 pylab.show()

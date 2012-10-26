@@ -173,11 +173,7 @@ class Matrix(object):
 		return Matrix(self.ht, self.wd, (f(x) for x in self.elts))
 		
 			
-##################################################
-#
-#	bras and kets
-#
-##################################################
+# bras and kets
 
 def dirac_scalar(z):
 	return all(not isinstance(z, T) for T in [Matrix, State, Operator, Braket])
