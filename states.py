@@ -344,6 +344,9 @@ lop = Operator(lambda b: b.raised(), lambda k: k.lowered())
 #
 ##################################################
 
+def madd(*terms):
+	return sum((0 if x is None else x) for x in terms)
+
 class State(object):
 	pass
 
@@ -357,7 +360,7 @@ class FockExpansion(State):
 		
 	def __add__(self, other):
 		if isinstance(other, FockExpansion):
-			return FockExpansion(*(sum(t) for t in zip(self.cs, other.cs)))
+			return FockExpansion(*(madd(z,w) for z, w in map(None, self.cs, other.cs)))
 		else:
 			return NotImplemented
 		
