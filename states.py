@@ -344,9 +344,6 @@ lop = Operator(lambda b: b.raised(), lambda k: k.lowered())
 #
 ##################################################
 
-def madd(*terms):
-	return sum((0 if x is None else x) for x in terms)
-
 class State(object):
 	pass
 
@@ -360,7 +357,7 @@ class FockExpansion(State):
 		
 	def __add__(self, other):
 		if isinstance(other, FockExpansion):
-			return FockExpansion(*(madd(z,w) for z, w in map(None, self.cs, other.cs)))
+			return FockExpansion(*(sum(t) for t in zip(self.cs, other.cs)))
 		else:
 			return NotImplemented
 		
@@ -476,17 +473,19 @@ def explower(z, s):
 ##################################################
 
 class Sum(State):
+	# the new idea is that construction takes the terms as given.
+	# the condition method, yet to be written, will combine terms
+	# with close amplitudes into displaced Fock expansions.
 	def __init__(self, *ts):
-		self.ts = {}		# terms indexed by their coherent amplitude
+		self.ts = []		# terms
 		for s in ts:
 			if isinstance(s, FockExpansion):
 				s = DisplacedState(0, s)
 			assert isinstance(s, DisplacedState)
-			self.ts[s.a] = \
-				self.ts[s.a] + s if s.a in self.ts else s
+			self.ts.append(s)
 				
 	def terms(self):
-		return self.ts.values()
+		return self.ts
 				
 	def __repr__(self):
 		return "Sum(" + ", ".join(repr(s) for s in self.terms()) + ")"
