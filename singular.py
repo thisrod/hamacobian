@@ -6,6 +6,7 @@ import pylab
 import scipy.interpolate
 from matplotlib.font_manager import FontProperties
 from matplotlib.transforms import blended_transform_factory
+from plot import plotens
 
 def randc():
 	return gauss(0,1) + gauss(0,1)*1j
@@ -55,11 +56,7 @@ for i in xrange(len(s)):
 	
 	# ensemble
 	pylab.subplot(2,2*R,i+1)
-	ax = pylab.gca()
-	circ = pylab.Circle((0, 0), 1, color='k', alpha=0.1)
-	ax.add_patch(circ)
-	for j in xrange(len(qas)):
-		pylab.text(qas[j].real, qas[j].imag, "%d" % j, va='center', ha='center')
+	plotens(q)
 		
 	# Q function of left sv
 	qpts = [Bra(coherent(x+y*1j)) for x in xs for y in ys]

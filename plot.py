@@ -10,6 +10,7 @@ def plotens(q):
 	ax = pylab.gca()
 	circ = pylab.Circle((0, 0), 1, color='k', alpha=0.1)
 	ax.add_patch(circ)
+	ax.axis('equal')
 	for j in xrange(a.size):
 		pylab.text(a[j].real, a[j].imag, "%d" % j, va='center', ha='center')
 	a = np.concatenate((a, [0]))

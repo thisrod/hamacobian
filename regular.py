@@ -7,11 +7,12 @@ from plot import plotens
 
 def randc(): return gauss(0,1) + gauss(0,1)*1j
 
-dmax = 2e-10		# range to shift z
-R = 3			# size of ensemble
+dmax = 1e-5		# range to shift z
+R = 4			# size of ensemble
 gs = 10		# points to plot
 rpts = 10		# directions to try
 p = 20		# basis size
+sig = 0.3		# standard deviation of initial ensemble
 
 ham = lop.conjugate()*lop.conjugate()*lop*lop
 
@@ -27,9 +28,10 @@ def zdot(ql, qr):
 # choose a random ensemble about amplitude 2
 basis = col(Bra(number(n)) for n in xrange(p))
 v = FockExpansion(1)
-q = Ket(Sum(*(DisplacedState(2+randc(), v) for i in xrange(R))))
+q = Ket(Sum(*(DisplacedState(2+sig*randc(), v) for i in xrange(R))))
 q /= norm(q)
 x = [float(x) for x in pylab.linspace(0,dmax, gs)]
+x = x[1:]		# avoid plotting log(0)
 
 zd = zdot(q,q)
 foo, sing, bar = numpy.linalg.svd(basis*q.D())
@@ -77,13 +79,13 @@ for k in xrange(rpts):
 		cnum.append(numpy.linalg.norm(basis*(q1.D()-q.D()), 2))
 	
 	pylab.subplot(321)
-	pylab.semilogy(x, left, hold=True)
+	pylab.plot(x, left, hold=True)
 	pylab.subplot(323)
-	pylab.semilogy(x, right, hold=True)
+	pylab.plot(x, right, hold=True)
 	pylab.subplot(325)
-	pylab.semilogy(x, both, hold=True)
+	pylab.plot(x, both, hold=True)
 	pylab.subplot(324)
-	pylab.semilogy(x, cnum, hold=True)
+	pylab.plot(x, cnum, hold=True)
 	
 pylab.show()
 
