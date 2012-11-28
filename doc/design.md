@@ -1,9 +1,32 @@
-Design of the states and patterns libraries
+Design of the states and patterns modules
 ======
 
 This file describes the libraries that implement simulations by variation of paths.  The theory behind the method, and its numerical stability, are described elsewhere.
 
 The variation of paths method uses sums of coherent states and their derivatives with respect to coefficients and coherent amplitudes.  It requires the calculation of brackets of these, and moments of the Hamiltonian between them.  This calculation is repeated at every timestep of a simulation.
+
+
+Matrix and scalar patterns
+----------------
+
+Patterns are a kind of method object.  The simplest type is the scalar pattern: these take an (m,n) vector of parameters as input, and return an (m) array of results as output.  The pattern represents some function f, and each element of the output is f(x[i,:]) for a row of input.  Some patterns take two parameter vectors, and return an (m1,m2) array whose elements are f(x1[i,:],x2[j,:]).
+
+The most straightforward scalar patterns are polynomials of the parameters, and the exponential that emerges from inner products of coherent states.  There are also scalar patterns that form bras, kets and operators; these are discussed below.
+
+Matrix patterns are formed from scalar patterns, whose output they interleave to form block arrays.  For example, a row pattern can be formed from three scalar patterns implementing functions f, g, and h.  It takes an (m,n) vector as input, and returns a (3*m) array (f(x[1,:]), g(x[1,:]), h(x[1,:]), …).  Optionally, it could have a block pattern p, in which case it would return (p(x[1,:])*f(x[1,:]), p(x[1,:])*g(x[1,:]), p(x[1,:])*h(x[1,:]), …).
+
+Column patterns are very similar, except that the scalar patterns are applied to conjugated parameters.  Outer product patterns take a matrix of scalar patterns, each of which takes two sets of parameters; they return a matrix where the first argument varies down columns, and the second across rows.  They also take a block pattern.  Sum patterns form a row or matrix, and sum the elements rowwise.
+
+Bras and kets are implemented by a type of scalar pattern called a state.  These act as bras when formed into columns, and kets when formed into rows.  When acting as a bra, a state expects to receive conjugated parameters, like any column.  The parameters of the state are scalar patterns for now; when we go multimode, coherent amplitudes might become structures.
+
+Matrix patterns can be multiplied by scalar patterns or matrix patterns, according to the usual rules.  States are treated as bras when multiplying rows, and kets when multiplying columns.
+
+Numbers and quantum operators are treated as constant scalar patterns.
+
+
+
+Waffle
+-----
 
 All of the states involved can be expressed as coherent states, under the action of raising and lowering operators.  
 
