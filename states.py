@@ -5,8 +5,7 @@ This module implements bras, kets, linear operators and matrices of
 those things.
 """
 
-from cmath import log, exp
-from utils import abs
+from cmath import exp, log
 from math import sqrt
 import numbers
 
@@ -396,10 +395,7 @@ class DisplacedState(State):
 	"state s, displaced by coherent amplitude a"
 	def __init__(self, a, s):
 		self.s = s
-		if isinstance(a, numbers.Complex):
-			self.a = complex(a)
-		else:
-			self.a = a
+		self.a = complex(a)
 
 	def __repr__(self):
 		return "DisplacedState(%s, %s)" % (repr(self.a), repr(self.s))
@@ -457,7 +453,7 @@ class DisplacedState(State):
 def ddmul(bra, ket):
 	# see soften.tex
 	b, a = bra.a, ket.a
-	return  exp(-0.5*abs(a)**2-0.5*abs(b.conjugate())**2+b.conjugate()*a) * (
+	return  exp(-0.5*abs(a)**2-0.5*abs(b)**2+b.conjugate()*a) * (
 		explower((a-b).conjugate(), bra.s) *
 		explower(-(a-b).conjugate(), ket.s))
 		
@@ -556,11 +552,7 @@ def norm(q):
 	return sqrt(abs(q.conjugate() * q))
 
 def coherent(alpha):
-	"""Return a coherent state with amplitude alpha.
-	
-	q = Ket(coherent(alpha))
-	p = Bra(coherent(alpha))
-	"""
+	"""Return a coherent state with amplitude alpha."""
 	return DisplacedState(alpha, FockExpansion(1))
 
 def number(n):
