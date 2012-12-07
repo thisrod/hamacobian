@@ -2,6 +2,7 @@
 
 from copy import copy
 import numpy as np
+from random import gauss
 
 # Absolute value dispatch for patterns
 
