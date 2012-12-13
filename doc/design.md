@@ -3,7 +3,7 @@ Design of the states and patterns modules
 
 This file describes the libraries that implement simulations by variation of paths.  The theory behind the method, and its numerical stability, are described elsewhere.
 
-The variation of paths method uses sums of coherent states and their derivatives with respect to coefficients and coherent amplitudes.  It requires the calculation of brackets of these, and moments of the Hamiltonian between them.  This calculation is repeated at every timestep of a simulation.
+The variation of paths method uses sums of coherent states, and the derivatives of those sums with respect to the coefficients and coherent amplitudes.  It requires the calculation of brackets of these, and moments of the Hamiltonian between them.  This calculation is repeated at every timestep of a simulation.
 
 
 Matrix and scalar patterns
@@ -15,6 +15,10 @@ The most straightforward scalar patterns are polynomials of the parameters, and 
 
 Matrix patterns are formed from scalar patterns, whose output they interleave to form block arrays.  For example, a row pattern can be formed from three scalar patterns implementing functions f, g, and h.  It takes an (m,n) vector as input, and returns a (3*m) array (f(x[1,:]), g(x[1,:]), h(x[1,:]), …).  Optionally, it could have a block pattern p, in which case it would return (p(x[1,:])*f(x[1,:]), p(x[1,:])*g(x[1,:]), p(x[1,:])*h(x[1,:]), …).
 
+The shape of a pattern is a tuple of the lengths of the parameter vectors it accepts.  Two patterns are similar if they have the same shape.
+
+Multiplying two patterns with |*| identifies their variables with each other.  The |mvmul| method forms a product where the variables are independent.
+
 Column patterns are very similar, except that the scalar patterns are applied to conjugated parameters.  Outer product patterns take a matrix of scalar patterns, each of which takes two sets of parameters; they return a matrix where the first argument varies down columns, and the second across rows.  They also take a block pattern.  Sum patterns form a row or matrix, and sum the elements rowwise.
 
 Bras and kets are implemented by a type of scalar pattern called a state.  These act as bras when formed into columns, and kets when formed into rows.  When acting as a bra, a state expects to receive conjugated parameters, like any column.  The parameters of the state are scalar patterns for now; when we go multimode, coherent amplitudes might become structures.
@@ -23,6 +27,13 @@ Matrix patterns can be multiplied by scalar patterns or matrix patterns, accordi
 
 Numbers and quantum operators are treated as constant scalar patterns.
 
+Derivatives still need to be sorted out.  There are two issues: arrays of parameters, and Wertinger derivatives.
+
+To evaluate moments, we need to add up the leading nonzero terms of Taylor series.  That requires a method |isZero| to tell when patterns are zero.  It returns |True| if the pattern evaluates to zero for all choices of input parameters.
+
+Patterns should be optimised for fast substitution.  Perhaps subst should return a closure, with some things precomputed?
+
+The __str__ method of a pattern takes an optional argument, a list of strings to represent the variables.
 
 
 Waffle
